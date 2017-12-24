@@ -230,49 +230,56 @@ plotsingleday(2017, 12, 22, '#02B7FF', earliest, latest)
 
 '''
 
-#download the data and convert it to the correct format
-dates, amount = loadData(dt.date(2017,12,22))
+def plotsingleday(year, month, day):
+	#download the data and convert it to the correct format
+	dates, amount = loadData(dt.date(year,month,day))
 
-#change the dates array to make it span only a single day
-#and also set the day to a single one, to make plotting of multiple graphs possible
-hourshift = 5
-for i in np.arange(len(dates)):
-	dates[i] -= dt.timedelta(hours = hourshift)
-	dates[i] = dt.datetime.combine(dt.date.today(), dates[i].time())
+	#set the label of the plot
+	label = str(np.min(dates).date())
 
-plt.plot(dates, amount, label = 'date')
+	#change the dates array to make it span only a single day
+	#and also set the day to a single one, to make plotting of multiple graphs possible
+	hourshift = 6
+	for i in np.arange(len(dates)):
+		dates[i] -= dt.timedelta(hours = hourshift)
+		dates[i] = dt.datetime.combine(dt.date.today(), dates[i].time())
 
-plotstart = np.min(dates)
-plotend = np.max(dates)
+	plt.plot(dates, amount, label = label)
 
-	#the plotting commands for plotting a single or multiple days
-#makes plot nicer
-sns.set_style("darkgrid", {'grid.color': '0.4', 'grid.linestyle': u':', 'legend.frameon': True})
+	plotstart = np.min(dates)
+	plotend = np.max(dates)
 
-#sets the xlim 
-plt.xlim(plotstart - dt.timedelta(minutes = 30), plotend + dt.timedelta(minutes = 30))
-plt.ylim(-10, 310)
+		#the plotting commands for plotting a single or multiple days
+	#makes plot nicer
+	sns.set_style("darkgrid", {'grid.color': '0.4', 'grid.linestyle': u':', 'legend.frameon': True})
 
-	#Change the xticks to display hours and minutes only
-#first find the minimum date/time
-orig_mindate = np.min(dates)
-# print(orig_mindate.time())
-#then round this down to the hour
-discard = dt.timedelta(minutes=orig_mindate.minute)
-mindate = orig_mindate - discard
-#then make arrays needed to change the ticks
-oldLabels = np.arange(mindate, np.max(dates) + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
-newLabels = []
-for d in oldLabels:
-	#add the 'hourshift' amount of hours again to make it show the correct hours
-	newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
-#change the x ticks
-plt.xticks(oldLabels, newLabels, rotation = 40)
+	#sets the xlim 
+	plt.xlim(plotstart - dt.timedelta(minutes = 30), plotend + dt.timedelta(minutes = 30))
+	plt.ylim(-10, 310)
 
-plt.legend(loc = 'lower right', shadow = True).draggable()
+		#Change the xticks to display hours and minutes only
+	#first find the minimum date/time
+	orig_mindate = np.min(dates)
+	# print(orig_mindate.time())
+	#then round this down to the hour
+	discard = dt.timedelta(minutes=orig_mindate.minute)
+	mindate = orig_mindate - discard
+	#then make arrays needed to change the ticks
+	oldLabels = np.arange(mindate, np.max(dates) + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
+	newLabels = []
+	for d in oldLabels:
+		#add the 'hourshift' amount of hours again to make it show the correct hours
+		newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
+	#change the x ticks
+	plt.xticks(oldLabels, newLabels, rotation = 40)
+
+plotsingleday(2017, 12, 22)
+plotsingleday(2016, 12, 23)
+
+plt.legend(loc = 'best', shadow = True).draggable()
 #plt.title('Aantal mensen te S.C.R.E.D. op ' + str(recDate.date()))
-plt.title('Aantal mensen te S.C.R.E.D. tijdens KSF 2017')
+plt.title('Aantal mensen te S.C.R.E.D. tijdens KSF 2016 en 2017')
 plt.xlabel('Tijd')
 plt.ylabel('Aantal')
-#plt.savefig("Aantal mensen te S.C.R.E.D. EL CID 2016.png", bbox_inches='tight', dpi = 200)
+plt.savefig("Aantal mensen te S.C.R.E.D. KSF 16-17.png", bbox_inches='tight', dpi = 200)
 plt.show()
