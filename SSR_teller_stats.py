@@ -14,6 +14,7 @@ from urllib.request import urlretrieve
 #for removing the downloaded file
 import os
 
+sns.set()
 plt.close()
 
 
@@ -24,37 +25,33 @@ endtime = dt.time(5)
 startPlot = dt.time(19,30)
 endPlot = dt.time(2,30)
 
-#earliest and latest start of counting
-earliest = dt.datetime.now()
-latest = dt.datetime(1900, 1, 1)
-
 #list of first and last data points for each day. From these the plotting
 #range is determined
 earliestlist = []
 latestlist = []
 
-downloadname = "./teller_log.txt"
-
-url = "https://api.joostvansomeren.nl/teller/log.txt"
-
-try:
-	#import data
-	data = np.loadtxt(downloadname, dtype = str).T
-	print("Loading old data. Remove 'Teller_log.txt' to download new data.")
-except:
-	#download log
-	print("Downloading new data")
-	urlretrieve(url, downloadname)
-	data = np.loadtxt(downloadname, dtype = str).T
-
 #remove downloaded file
 #os.remove(downloadname)
-
 
 def loadData(download_date):
 	"""
 	Load the data of the day given by download_date
 	"""
+
+	downloadname = "./teller_log.txt"
+
+	url = "https://api.joostvansomeren.nl/teller/log.txt"
+
+	try:
+		#import data
+		data = np.loadtxt(downloadname, dtype = str).T
+		print("Loading old data. Remove 'Teller_log.txt' to download new data.")
+	except:
+		#download log
+		print("Downloading new data")
+		urlretrieve(url, downloadname)
+		data = np.loadtxt(downloadname, dtype = str).T
+
 	monthlist = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 	
 	#arrays containing the data
@@ -87,42 +84,36 @@ def loadData(download_date):
 				prevamount = int(sl[0])
 
 	return dates, amount
-	
+
 
 #plots teller data of single day
-def plotsingleday(yr, m, d, colour, earliest, latest):
+def plotsingleday(yr, m, d, colour, dates, amount):
+	"""
+	Plot the data of a single day
+	"""
 	checkdate = dt.date(yr, m, d)
+
+	#earliest and latest start of counting
+	earliest = dt.datetime.now()
+	latest = dt.datetime(1900, 1, 1)
 	
-	#loads that day and the day after (because events go on past 24:00 h)
-	slicedamount1, slicedtime1 = sliceDates(checkdate, starttime, endtime, True)
-	slicedamount2, slicedtime2 = sliceDates(checkdate, starttime, endtime, False)
-	slicedamount = np.append(slicedamount1, slicedamount2)
-	#slicedtime = np.append(slicedtime1, slicedtime2)
-	#makes a datetime array which can be used for plotting (crossing 00:00 h)
-	sliceddate = []
-	for i in np.arange(len(slicedtime1)):
-		tempappend1 = dt.datetime.combine(dt.date(2016,5,1), slicedtime1[i].time())
-		sliceddate = np.append(sliceddate, tempappend1)
-	for i in np.arange(len(slicedtime2)):
-		tempappend2 = dt.datetime.combine(dt.date(2016,5,2), slicedtime2[i].time())
-		sliceddate = np.append(sliceddate, tempappend2)
 	#checks the earliest and latest times
-	if sliceddate[0] < earliest:
-		earliest = sliceddate[0]
-	if sliceddate[len(sliceddate) - 1] > latest:
-		latest = sliceddate[len(sliceddate) - 1]
+	if dates[0] < earliest:
+		earliest = dates[0]
+	if dates[len(dates) - 1] > latest:
+		latest = dates[len(dates) - 1]
 		
 	#print the latest 8 registrations
 	print("----------------")
 	print("Latest entries:")
 	for i in np.arange(8)[::-1]:
-		print(sliceddate[len(sliceddate) - i - 1].time(), slicedamount[len(sliceddate) - i - 1])
+		print(dates[len(dates) - i - 1].time(), amount[len(dates) - i - 1])
 	print("----------------")
 	
 	#plotting
 #	fig, ax = plt.subplots()
 	#plt.scatter(sliceddate, slicedamount, edgecolor = 'none', color = colour, label = checkdate)
-	plt.plot(sliceddate, slicedamount, color = colour, label = checkdate)
+	plt.plot(dates, amount, color = colour, label = checkdate)
 	#plt.xlim(dt.datetime.combine(sliceddate[0].date(), startPlot), dt.datetime.combine(sliceddate[len(sliceddate)-1].date(), endPlot))
 	
 	#set the x ticks in appropriate positions
@@ -135,7 +126,7 @@ def plotsingleday(yr, m, d, colour, earliest, latest):
 	
 	earliestlist.append(earliest)
 	latestlist.append(latest)
-	
+'''
 	#plot the most recent date
 def plotRecent(earliest, latest):
 	#first load the most recent date
@@ -192,8 +183,6 @@ def plotAllBorrels():
 	
 earliest, latest, recDate = plotRecent(earliest, latest)	
 
-'''
-'''
 	#plot data per day
 
 #first borrels in september 2016
@@ -239,16 +228,46 @@ plotsingleday(2016, 9, 12, '#FF8E06', earliest, latest)
 
 plotsingleday(2017, 12, 22, '#02B7FF', earliest, latest)
 
-plotstart = np.min(earliestlist)
-plotend = np.max(latestlist)
+'''
+
+#download the data and convert it to the correct format
+dates, amount = loadData(dt.date(2017,12,22))
+
+#change the dates array to make it span only a single day
+#and also set the day to a single one, to make plotting of multiple graphs possible
+hourshift = 5
+for i in np.arange(len(dates)):
+	dates[i] -= dt.timedelta(hours = hourshift)
+	dates[i] = dt.datetime.combine(dt.date.today(), dates[i].time())
+
+plt.plot(dates, amount, label = 'date')
+
+plotstart = np.min(dates)
+plotend = np.max(dates)
 
 	#the plotting commands for plotting a single or multiple days
 #makes plot nicer
 sns.set_style("darkgrid", {'grid.color': '0.4', 'grid.linestyle': u':', 'legend.frameon': True})
 
-##sets the xlim 
+#sets the xlim 
 plt.xlim(plotstart - dt.timedelta(minutes = 30), plotend + dt.timedelta(minutes = 30))
 plt.ylim(-10, 310)
+
+	#Change the xticks to display hours and minutes only
+#first find the minimum date/time
+orig_mindate = np.min(dates)
+# print(orig_mindate.time())
+#then round this down to the hour
+discard = dt.timedelta(minutes=orig_mindate.minute)
+mindate = orig_mindate - discard
+#then make arrays needed to change the ticks
+oldLabels = np.arange(mindate, np.max(dates) + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
+newLabels = []
+for d in oldLabels:
+	#add the 'hourshift' amount of hours again to make it show the correct hours
+	newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
+#change the x ticks
+plt.xticks(oldLabels, newLabels, rotation = 40)
 
 plt.legend(loc = 'lower right', shadow = True).draggable()
 #plt.title('Aantal mensen te S.C.R.E.D. op ' + str(recDate.date()))
@@ -256,11 +275,4 @@ plt.title('Aantal mensen te S.C.R.E.D. tijdens KSF 2017')
 plt.xlabel('Tijd')
 plt.ylabel('Aantal')
 #plt.savefig("Aantal mensen te S.C.R.E.D. EL CID 2016.png", bbox_inches='tight', dpi = 200)
-plt.show()
-'''
-#plotAllBorrels()
-
-dates, amount = loadData(dt.date(2017,12,22))
-
-plt.plot(dates, amount)
 plt.show()
