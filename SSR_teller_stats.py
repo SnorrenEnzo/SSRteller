@@ -88,47 +88,6 @@ def loadData(download_date):
 
 	return dates, amount
 
-
-#plots teller data of single day
-def plotsingleday(yr, m, d, colour, dates, amount):
-	"""
-	Plot the data of a single day
-	"""
-	checkdate = dt.date(yr, m, d)
-
-	#earliest and latest start of counting
-	earliest = dt.datetime.now()
-	latest = dt.datetime(1900, 1, 1)
-	
-	#checks the earliest and latest times
-	if dates[0] < earliest:
-		earliest = dates[0]
-	if dates[len(dates) - 1] > latest:
-		latest = dates[len(dates) - 1]
-		
-	#print the latest 8 registrations
-	print("----------------")
-	print("Latest entries:")
-	for i in np.arange(8)[::-1]:
-		print(dates[len(dates) - i - 1].time(), amount[len(dates) - i - 1])
-	print("----------------")
-	
-	#plotting
-#	fig, ax = plt.subplots()
-	#plt.scatter(sliceddate, slicedamount, edgecolor = 'none', color = colour, label = checkdate)
-	plt.plot(dates, amount, color = colour, label = checkdate)
-	#plt.xlim(dt.datetime.combine(sliceddate[0].date(), startPlot), dt.datetime.combine(sliceddate[len(sliceddate)-1].date(), endPlot))
-	
-	#set the x ticks in appropriate positions
-#	xax = ax.get_xaxis() # get the x-axis
-#	adf = xax.get_major_formatter() # the the auto-formatter
-#	adf.scaled[1./24] = '%H:%M'  # set the < 1d scale to H:M
-#	adf.scaled[1.0] = '%Y-%m-%d' # set the > 1d < 1m scale to Y-m-d
-#	adf.scaled[30.] = '%Y-%m' # set the > 1m < 1Y scale to Y-m
-#	adf.scaled[365.] = '%Y' # set the > 1y scale to Y
-	
-	earliestlist.append(earliest)
-	latestlist.append(latest)
 '''
 	#plot the most recent date
 def plotRecent(earliest, latest):
@@ -233,7 +192,7 @@ plotsingleday(2017, 12, 22, '#02B7FF', earliest, latest)
 
 '''
 
-def plotsingleday(year, month, day, colorval, hourshift):
+def plotsingleday(plotdate, colorval, hourshift, alpha = 1):
 	"""
 	Loads and plots the SSR teller data of a single day.
 
@@ -242,11 +201,17 @@ def plotsingleday(year, month, day, colorval, hourshift):
 		data must be plotted. The date is defined as the starting date of the evening (
 		parties almost always go beyond 24:00 h).\n
 		colorval (matpotlib color value or str): the colour to be used for plotting the graph. \n
-		hourshift (int): the amount of hours the dates will be shifted by for plotting.
+		hourshift (int): the amount of hours the dates will be shifted by for plotting.\n
+		alpha (float): the translucence of the plot line. 0: completely translucent. 1: 
+		completely opaque. Can be used to plot multiple dates with different line opacities.
+
+	Output:
+		min_dates (datetime): the first time stamp of the data.\n
+		max_dates (datetime): the last time stamp of the data.
 	"""
 
 	#download the data and convert it to the correct format
-	dates, amount = loadData(dt.date(year,month,day))
+	dates, amount = loadData(plotdate.date())
 
 	#set the label of the plot
 	label = str(np.min(dates).date())
@@ -257,7 +222,7 @@ def plotsingleday(year, month, day, colorval, hourshift):
 		dates[i] -= dt.timedelta(hours = hourshift)
 		dates[i] = dt.datetime.combine(dt.date.today(), dates[i].time())
 
-	plt.plot(dates, amount, label = label, color = colorval)
+	plt.plot(dates, amount, label = label, color = colorval, alpha = alpha)
 
 	plotstart = np.min(dates)
 	plotend = np.max(dates)
@@ -274,13 +239,22 @@ def plotsingleday(year, month, day, colorval, hourshift):
 
 
 #lists containing the dates to be plotted
+'''
+#KSF 2016 and 2017
 years = [2016, 2017]
 months = [12, 12]
 days = [23, 22]
+date_list = []
+for y, m, d in zip(years, months, days):
+	date_list.append(dt.date(y,m,d))
+'''
+#All dinsdagborrels of the autumn of 2017
+date_list = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
+
 
 #initialize functions to get many plotting colours
 jet = plt.get_cmap('jet') 
-cNorm  = colors.Normalize(vmin=0, vmax=len(years)+1)
+cNorm  = colors.Normalize(vmin=0, vmax=len(date_list)+1)
 scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=jet)
 
 #the first and last time stamps found for each date
@@ -291,10 +265,10 @@ lastdates = []
 hourshift = 6
 
 #plot all the dates
-for i in np.arange(len(years)):
+for i in np.arange(len(date_list)):
 	colorVal = scalarMap.to_rgba(i)		
 	
-	fd, ld = plotsingleday(years[i], months[i], days[i], colorval = colorVal, hourshift = hourshift)
+	fd, ld = plotsingleday(date_list[i], colorval = colorVal, hourshift = hourshift)
 	#append the found first and last time stamps
 	firstdates.append(fd)
 	lastdates.append(ld)
@@ -316,9 +290,8 @@ for d in oldLabels:
 plt.xticks(oldLabels, newLabels, rotation = 40)
 
 plt.legend(loc = 'best', shadow = True).draggable()
-#plt.title('Aantal mensen te S.C.R.E.D. op ' + str(recDate.date()))
-plt.title('Aantal mensen te S.C.R.E.D. tijdens KSF 2016 en 2017')
+plt.title('Aantal mensen te S.C.R.E.D.')
 plt.xlabel('Tijd')
 plt.ylabel('Aantal')
-plt.savefig("Aantal mensen te S.C.R.E.D. KSF 16-17.png", bbox_inches='tight', dpi = 200)
+#plt.savefig("Aantal mensen te S.C.R.E.D. KSF 16-17.png", bbox_inches='tight', dpi = 200)
 plt.show()
