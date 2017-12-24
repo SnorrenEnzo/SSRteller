@@ -136,9 +136,6 @@ def findFullTime(dates, amount, nowmoment, diffwidth = 10):
 		diffwidth (int): length of time in minutes of which data will be aggregated to 
 		calculate the derivative.
 	"""
-	
-	def model(x, a, b, c, d):
-		return a*x**3 + b*x**2 + c*x + d
 		
 	#slice the data to the last diffwidth number of minutes
 	diffbegin = 0
@@ -160,40 +157,56 @@ def findFullTime(dates, amount, nowmoment, diffwidth = 10):
 	for a in amount[diffbegin:diffend]:
 		n_s = a - (nowmoment - dt.timedelta(minutes = diffwidth))
 		print(n_s)
-	'''
-	popt, pcov = curve_fit(model, xdata, ydata, p0 = (1000., 1.))
-	#Then the standard deviation is given by:
-	perr = np.sqrt(np.diag(pcov))
-	#get the residuals:
-	residuals = ydata- model(xdata, popt)
-	#to get R^2:
-	ss_res = np.sum(residuals**2)
-	ss_tot = np.sum((ydata-np.mean(ydata))**2)
-	r_squared = 1 - (ss_res / ss_tot)
-	'''
 	
-def makeplot(dates, amount):
-	amountdiff = np.diff(amount)
-	timediff = np.diff(dates)
-	tdiff_s = []
-	for t in timediff:
-		tdiff_s = np.append(tdiff_s, float(t.seconds))
-
+def makeplot(dates, amount, now):
 	sns.set()
 
-	#plot with two axes:
-	fig, ax1 = plt.subplots()
-	#makes another y-axis
-	ax2 = ax1.twinx()
-	#plots first line
-	lns1 = ax1.plot(dates, amount, color = 'b')
-	#plots second line
+	#select all dates before our measurement point
+	amount = amount[dates < now]
+	dates = dates[dates < now]
+	
+	#model to be used by the fitting routine
+	def model(x, a, b, c, d):
+		return a*x**3 + b*x**2 + c*x + d
 
-	#lns2 = ax2.plot(dates, np.append(amountdiff/tdiff_s, 0), color = 'r')
-	for tl1 in ax1.get_yticklabels():
-		tl1.set_color('b')
-	for tl2 in ax2.get_yticklabels():
-		tl2.set_color('r')
+	#convert the dates to seconds for the model
+	x_seconds = np.zeros(len(dates))
+	for i in np.arange(len(dates)):
+		x_seconds[i] = (dates[i]-dt.datetime(1970,1,1)).total_seconds()
+
+	#ts = dt.datetime.fromtimestamp(x_seconds[0]).strftime('%Y-%m-%d %H:%M:%S')
+	#print(ts)
+
+	#apply the fit
+	popt, pcov = curve_fit(model, x_seconds - 1.5e9, amount)
+	#the standard deviation is given by:
+	#perr = np.sqrt(np.diag(pcov))
+	#get the residuals:
+	#residuals = ydata- model(xdata, popt)
+	#to get R^2:
+	#ss_res = np.sum(residuals**2)
+	#ss_tot = np.sum((ydata-np.mean(ydata))**2)
+	#r_squared = 1 - (ss_res / ss_tot)
+
+	#plot with two axes:
+	# fig, ax1 = plt.subplots()
+	#makes another y-axis
+	# ax2 = ax1.twinx()
+	#plots the normal data
+	# lns1 = ax1.plot(dates, amount, color = 'b')
+	#plots the fit
+	# lns2 = ax2.plot(dates, model(x_seconds, *popt), color = 'r')
+
+	# for tl1 in ax1.get_yticklabels():
+	# 	tl1.set_color('b')
+	# for tl2 in ax2.get_yticklabels():
+	# 	tl2.set_color('r')
+
+	print(popt)
+
+	plt.plot(dates, amount, color = 'b')
+	plt.plot(dates, model(x_seconds - 1.5e9, *popt), color = 'r')
+	plt.xticks(rotation = 40)
 	
 	plt.show()
 	
@@ -259,38 +272,54 @@ def popupmsg(msg, title = 'Warning!'):
 	B1 = ttk.Button(popup, text='Okay', command = popup.destroy)
 	B1.pack()
 	popup.mainloop()
-    
-#makeplot(dates, amount)
 
-#time to wait between each run, in seconds
-waittime = 30
+def check():
+	"""
+	Continiously checks the predicted amount of people in the building. 
+	"""
+	#time to wait between each run, in seconds
+	waittime = 30
 
-#number of minutes that the warning should be in advance of the building being full
-warningmin = 20
+	#number of minutes that the warning should be in advance of the building being full
+	warningmin = 20
 
-#initializing the amount of people in the building
-currentamount = 0
+	#initializing the amount of people in the building
+	currentamount = 0
 
-while currentamount < maxnum:
-	now = dt.datetime.today()
-	#now = dt.datetime.strptime('10-31-2017 22:15:00', '%m-%d-%Y %H:%M:%S')
+	while currentamount < maxnum:
+		now = dt.datetime.today()
+		#now = dt.datetime.strptime('10-31-2017 22:15:00', '%m-%d-%Y %H:%M:%S')
 
-	downloadData()
-	dates, amount = loadData(now)
-	
-	#break the loop if the data is not of today
-	if len(dates) < 1:
-		print('No data of today yet. Skipping check...')
-	else:
-		deriv, fulltime, currentamount = findDeriv(dates, amount, now)
-	
-		#print the message indicating how full the building is
-		fullmessage = 'S.C.R.E.D. at {0}/{1} capacity. Full in {2}:%02d'.format(int(currentamount), maxnum, int(fulltime/60)) % int(fulltime % 60)
-		print(fullmessage)
-
-		#show a warning when the building will be full in less than 15 minutes
-		if currentamount > 180 and (fulltime / 60) < warningmin and fulltime > 0:
-			popupmsg(fullmessage)
+		downloadData()
+		dates, amount = loadData(now)
 		
-	#wait for a few seconds
-	time.sleep(waittime)
+		#break the loop if the data is not of today
+		if len(dates) < 1:
+			print('No data of today yet. Skipping check...')
+		else:
+			deriv, fulltime, currentamount = findDeriv(dates, amount, now)
+		
+			#print the message indicating how full the building is
+			fullmessage = 'S.C.R.E.D. at {0}/{1} capacity. Full in {2}:%02d'.format(int(currentamount), maxnum, int(fulltime/60)) % int(fulltime % 60)
+			print(fullmessage)
+
+			#show a warning when the building will be full in less than 15 minutes
+			if currentamount > 180 and (fulltime / 60) < warningmin and fulltime > 0:
+				popupmsg(fullmessage)
+			
+		#wait for a few seconds
+		time.sleep(waittime)
+   
+now = dt.datetime.strptime('10-31-2017 22:15:00', '%m-%d-%Y %H:%M:%S')
+
+downloadData()
+dates, amount = loadData(now)
+
+makeplot(dates, amount, now)
+
+#check()
+
+
+
+
+
