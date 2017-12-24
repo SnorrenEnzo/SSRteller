@@ -197,9 +197,9 @@ def plotsingleday(plotdate, colorval, hourshift, alpha = 1):
 	Loads and plots the SSR teller data of a single day.
 
 	Input:
-		year, month, day (ints): the year, month and day of the date of which the
-		data must be plotted. The date is defined as the starting date of the evening (
-		parties almost always go beyond 24:00 h).\n
+		plotdate (datetime): The date of which the data must be plotted.
+		The date is defined as the starting date of the evening (parties almost always 
+		go beyond 24:00 h).\n
 		colorval (matpotlib color value or str): the colour to be used for plotting the graph. \n
 		hourshift (int): the amount of hours the dates will be shifted by for plotting.\n
 		alpha (float): the translucence of the plot line. 0: completely translucent. 1: 
@@ -237,6 +237,113 @@ def plotsingleday(plotdate, colorval, hourshift, alpha = 1):
 
 	return np.min(dates), np.max(dates)
 
+def plotMultipleDates(date_list):
+	"""
+	This function plots the graphs of the amount of people in the building for different
+	dates in a single figure.
+
+	Input:
+		date_list (datetime array): array of dates.
+	"""
+	#initialize functions to get many plotting colours
+	jet = plt.get_cmap('jet') 
+	cNorm  = colors.Normalize(vmin=0, vmax=len(date_list)+1)
+	scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=jet)
+
+	#the first and last time stamps found for each date
+	firstdates = []
+	lastdates = []
+	#the amount of hours the dates will be shifted in the plotsingleday() function
+	#this shifting is necessary to facilitate plotting different dates in a single plot
+	hourshift = 5
+
+	#plot all the dates
+	for i in np.arange(len(date_list)):
+		colorVal = scalarMap.to_rgba(i)	
+		
+		fd, ld = plotsingleday(date_list[i], colorval = colorVal, hourshift = hourshift)
+		#append the found first and last time stamps
+		firstdates.append(fd)
+		lastdates.append(ld)
+
+		#Change the xticks to display hours and minutes only
+	#first find the minimum date/time
+	orig_mindate = np.min(firstdates)
+	# print(orig_mindate.time())
+	#then round this down to the hour
+	discard = dt.timedelta(minutes=orig_mindate.minute)
+	mindate = orig_mindate - discard
+	#then make arrays needed to change the ticks
+	oldLabels = np.arange(mindate, np.max(lastdates) + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
+	newLabels = []
+	for d in oldLabels:
+		#add the 'hourshift' amount of hours again to make it show the correct hours
+		newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
+	#change the x ticks
+	plt.xticks(oldLabels, newLabels, rotation = 40)
+
+	plt.legend(loc = 'best', shadow = True).draggable()
+	plt.title('Aantal mensen te S.C.R.E.D.')
+	plt.xlabel('Tijd')
+	plt.ylabel('Aantal')
+	#plt.savefig("Aantal mensen te S.C.R.E.D. KSF 16-17.png", bbox_inches='tight', dpi = 200)
+	plt.show()
+
+def plotDates_separate(date_list1, datelist2 = None, saveloc = 'Dinsdagborrels_herfst_2017/'):
+	"""
+	Plot multiple dates, but each as a separate file. This way the images can later be 
+	used as frames in a video. 
+
+	Input:
+		date_list1 (datetime array): list of dates to be plotted. \n
+		date_list2 (datetime array): an optional second list of dates to be plotted together
+		with the first list in the same figures.\n
+		saveloc (str): location where the files should be saved.
+	"""
+
+	#the colour used for plotting
+	colorVal = 'g'
+
+	#the amount of hours the dates will be shifted in the plotsingleday() function
+	#this shifting is necessary to facilitate plotting different dates in a single plot
+	hourshift = 6
+
+	#plot all the dates
+	for i in np.arange(len(date_list1)):	
+
+		fig = plt.figure(figsize=(9,6))	
+		
+		fd, ld = plotsingleday(date_list1[i], colorval = colorVal, hourshift = hourshift)
+		if datelist2 is not None:
+			fd, ld = plotsingleday(date_list2[i], colorval = 'b', hourshift = hourshift)
+
+			#Change the xticks to display hours and minutes only
+		#first find the minimum date/time
+		starttime = dt.datetime.combine(dt.date.today(), dt.time(20 - hourshift, 0))
+		endtime = dt.datetime.combine(dt.date.today(), dt.time(24 + 4 - hourshift, 0))
+		orig_mindate = starttime
+		# print(orig_mindate.time())
+		#then round this down to the hour
+		discard = dt.timedelta(minutes=orig_mindate.minute)
+		mindate = orig_mindate - discard
+		#then make arrays needed to change the ticks
+		oldLabels = np.arange(mindate, endtime + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
+		newLabels = []
+		for d in oldLabels:
+			#add the 'hourshift' amount of hours again to make it show the correct hours
+			newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
+		#change the x ticks
+		plt.xticks(oldLabels, newLabels, rotation = 40)
+		plt.xlim(np.min(oldLabels), np.max(oldLabels))
+
+		plt.legend(loc = 'upper right', shadow = True).draggable()
+		plt.title('Aantal mensen te S.C.R.E.D.')
+		plt.xlabel('Tijd')
+		plt.ylabel('Aantal')
+		plt.savefig("{0}img{1}.png".format(saveloc, len(date_list1) - i), dpi = 200)
+		#plt.show()
+		plt.close()
+
 
 #lists containing the dates to be plotted
 '''
@@ -249,49 +356,7 @@ for y, m, d in zip(years, months, days):
 	date_list.append(dt.date(y,m,d))
 '''
 #All dinsdagborrels of the autumn of 2017
-date_list = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
+date_list1 = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
+date_list2 = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
 
-
-#initialize functions to get many plotting colours
-jet = plt.get_cmap('jet') 
-cNorm  = colors.Normalize(vmin=0, vmax=len(date_list)+1)
-scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=jet)
-
-#the first and last time stamps found for each date
-firstdates = []
-lastdates = []
-#the amount of hours the dates will be shifted in the plotsingleday() function
-#this shifting is necessary to facilitate plotting different dates in a single plot
-hourshift = 6
-
-#plot all the dates
-for i in np.arange(len(date_list)):
-	colorVal = scalarMap.to_rgba(i)		
-	
-	fd, ld = plotsingleday(date_list[i], colorval = colorVal, hourshift = hourshift)
-	#append the found first and last time stamps
-	firstdates.append(fd)
-	lastdates.append(ld)
-
-	#Change the xticks to display hours and minutes only
-#first find the minimum date/time
-orig_mindate = np.min(firstdates)
-# print(orig_mindate.time())
-#then round this down to the hour
-discard = dt.timedelta(minutes=orig_mindate.minute)
-mindate = orig_mindate - discard
-#then make arrays needed to change the ticks
-oldLabels = np.arange(mindate, np.max(lastdates) + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
-newLabels = []
-for d in oldLabels:
-	#add the 'hourshift' amount of hours again to make it show the correct hours
-	newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
-#change the x ticks
-plt.xticks(oldLabels, newLabels, rotation = 40)
-
-plt.legend(loc = 'best', shadow = True).draggable()
-plt.title('Aantal mensen te S.C.R.E.D.')
-plt.xlabel('Tijd')
-plt.ylabel('Aantal')
-#plt.savefig("Aantal mensen te S.C.R.E.D. KSF 16-17.png", bbox_inches='tight', dpi = 200)
-plt.show()
+plotDates_separate(date_list1, date_list2, saveloc = 'Dinsdagborrels_herfst_16-17/')
