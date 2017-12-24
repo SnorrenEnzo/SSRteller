@@ -50,62 +50,44 @@ except:
 #remove downloaded file
 #os.remove(downloadname)
 
-#loads amount of people in the building in an array
-amount = data[0].astype(int)
-#converts month abbreviations to numbers
-monthN = np.zeros(len(data[3]), dtype = int)
-monthlist = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-for i in np.arange(len(data[3])):
-	tempmonth = data[3, i]
-	monthN[i] = monthlist.index(tempmonth) + 1
 
-#loads the date and time as datetime objects
-date = []
-time = []
-for i in np.arange(len(data[6])):
-	#combines the multiple data string arrays into single string
-	tempstring = str(monthN[i]) + '-' + data[4, i] + '-' + data[5, i] + ' ' + data[6, i]	
-	date = np.append(date, dt.datetime.strptime(tempstring, '%m-%d-%Y %H:%M:%S'))
-
-
-#slices the data to an array at a single day
-def sliceDates(checkDate, starttime, endtime, firstDay):
-	'''
-	Slices data to a single array if it is between the specified time interval
+def loadData(download_date):
+	"""
+	Load the data of the day given by download_date
+	"""
+	monthlist = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 	
-	Input:
-		checkDate (datetime): the date
-		
-		startime (datetime): the time before which all data points can be thrown
-		away
-		
-		endtime (datetime): the time after which all data points can be thrown 
-		away
-		
-		firstDay (boolean): whether we are looking at the first day of the event
-		(because events switch to a different day at 24:00 h)
-		
-	Returns:
-		slicedamount (int array): sliced array of amount values
-		
-		sliceddate (datetime array): sliced array containing the date & time
-	'''
-	slicedamount = []
-	sliceddate = []
+	#arrays containing the data
+	dates = []
+	amount = []
 	
-	if firstDay == False:
-		 checkDate += dt.timedelta(days = 1)
-	
-	for i in np.arange(len(amount)):
-		if date[i].date() == checkDate and ((date[i].time() > starttime and 
-		firstDay) or (date[i].time() < endtime and firstDay == False)):
-			slicedamount = np.append(slicedamount, amount[i])
-			sliceddate = np.append(sliceddate, date[i])
+	with open(downloadname, 'r') as f:
+		prevdate = dt.datetime(1900, 1, 1)
+		prevamount = 0
+		
+		for line in f:
+			#split the line using the spaces
+			sl = line.split()
+			#convert the text month to a month number
+			monthN = monthlist.index(sl[3]) + 1
+			#find the date of the line
+			tempstring = '{0}-{1}-{2} {3}'.format(monthN, sl[4], sl[5], sl[6])
+			tdatetime = dt.datetime.strptime(tempstring, '%m-%d-%Y %H:%M:%S')
 			
-	return slicedamount, sliceddate
+			#add the date to the array if it is the correct day
+			if tdatetime.date() == download_date or tdatetime.date() == download_date + dt.timedelta(days = 1):
+				#check if the current time is not equal to the previous one. If so,
+				#add the sum of the last few entries
 
-#.scatter(time, amount)
-#plt.show()
+				if (tdatetime - prevdate) > dt.timedelta(seconds = 0) and prevdate > dt.datetime(1900, 1, 1):
+					dates = np.append(dates, prevdate)
+					amount = np.append(amount, prevamount)
+					
+				prevdate = tdatetime
+				prevamount = int(sl[0])
+
+	return dates, amount
+	
 
 #plots teller data of single day
 def plotsingleday(yr, m, d, colour, earliest, latest):
@@ -168,6 +150,7 @@ def plotRecent(earliest, latest):
 	#then plot it
 	earliest, latest = plotsingleday(recDate.year, recDate.month, recDate.day, 'b', earliest, latest)
 	return earliest, latest, recDate
+
 	
 def plotAllBorrels():
 	"""
@@ -208,6 +191,8 @@ def plotAllBorrels():
 	plt.show()
 	
 earliest, latest, recDate = plotRecent(earliest, latest)	
+
+'''
 '''
 	#plot data per day
 
@@ -252,6 +237,8 @@ earliest, latest = plotsingleday(recDate.year, recDate.month, recDate.day,
 #plotsingleday(2016, 8, 19, '#FF8E06', earliest, latest)
 plotsingleday(2016, 9, 12, '#FF8E06', earliest, latest)
 
+plotsingleday(2017, 12, 22, '#02B7FF', earliest, latest)
+
 plotstart = np.min(earliestlist)
 plotend = np.max(latestlist)
 
@@ -265,11 +252,15 @@ plt.ylim(-10, 310)
 
 plt.legend(loc = 'lower right', shadow = True).draggable()
 #plt.title('Aantal mensen te S.C.R.E.D. op ' + str(recDate.date()))
-plt.title('Aantal mensen te S.C.R.E.D. tijdens EL CID 2016')
+plt.title('Aantal mensen te S.C.R.E.D. tijdens KSF 2017')
 plt.xlabel('Tijd')
 plt.ylabel('Aantal')
 #plt.savefig("Aantal mensen te S.C.R.E.D. EL CID 2016.png", bbox_inches='tight', dpi = 200)
 plt.show()
-
 '''
 #plotAllBorrels()
+
+dates, amount = loadData(dt.date(2017,12,22))
+
+plt.plot(dates, amount)
+plt.show()
