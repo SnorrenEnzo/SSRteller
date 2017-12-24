@@ -13,6 +13,9 @@ import seaborn as sns
 from urllib.request import urlretrieve
 #for removing the downloaded file
 import os
+#for getting many plotting colours
+import matplotlib.colors as colors
+import matplotlib.cm as cmx
 
 sns.set()
 plt.close()
@@ -230,7 +233,18 @@ plotsingleday(2017, 12, 22, '#02B7FF', earliest, latest)
 
 '''
 
-def plotsingleday(year, month, day):
+def plotsingleday(year, month, day, colorval, hourshift):
+	"""
+	Loads and plots the SSR teller data of a single day.
+
+	Input:
+		year, month, day (ints): the year, month and day of the date of which the
+		data must be plotted. The date is defined as the starting date of the evening (
+		parties almost always go beyond 24:00 h).\n
+		colorval (matpotlib color value or str): the colour to be used for plotting the graph. \n
+		hourshift (int): the amount of hours the dates will be shifted by for plotting.
+	"""
+
 	#download the data and convert it to the correct format
 	dates, amount = loadData(dt.date(year,month,day))
 
@@ -239,12 +253,11 @@ def plotsingleday(year, month, day):
 
 	#change the dates array to make it span only a single day
 	#and also set the day to a single one, to make plotting of multiple graphs possible
-	hourshift = 6
 	for i in np.arange(len(dates)):
 		dates[i] -= dt.timedelta(hours = hourshift)
 		dates[i] = dt.datetime.combine(dt.date.today(), dates[i].time())
 
-	plt.plot(dates, amount, label = label)
+	plt.plot(dates, amount, label = label, color = colorval)
 
 	plotstart = np.min(dates)
 	plotend = np.max(dates)
@@ -257,24 +270,50 @@ def plotsingleday(year, month, day):
 	plt.xlim(plotstart - dt.timedelta(minutes = 30), plotend + dt.timedelta(minutes = 30))
 	plt.ylim(-10, 310)
 
-		#Change the xticks to display hours and minutes only
-	#first find the minimum date/time
-	orig_mindate = np.min(dates)
-	# print(orig_mindate.time())
-	#then round this down to the hour
-	discard = dt.timedelta(minutes=orig_mindate.minute)
-	mindate = orig_mindate - discard
-	#then make arrays needed to change the ticks
-	oldLabels = np.arange(mindate, np.max(dates) + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
-	newLabels = []
-	for d in oldLabels:
-		#add the 'hourshift' amount of hours again to make it show the correct hours
-		newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
-	#change the x ticks
-	plt.xticks(oldLabels, newLabels, rotation = 40)
+	return np.min(dates), np.max(dates)
 
-plotsingleday(2017, 12, 22)
-plotsingleday(2016, 12, 23)
+
+#lists containing the dates to be plotted
+years = [2016, 2017]
+months = [12, 12]
+days = [23, 22]
+
+#initialize functions to get many plotting colours
+jet = plt.get_cmap('jet') 
+cNorm  = colors.Normalize(vmin=0, vmax=len(years)+1)
+scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=jet)
+
+#the first and last time stamps found for each date
+firstdates = []
+lastdates = []
+#the amount of hours the dates will be shifted in the plotsingleday() function
+#this shifting is necessary to facilitate plotting different dates in a single plot
+hourshift = 6
+
+#plot all the dates
+for i in np.arange(len(years)):
+	colorVal = scalarMap.to_rgba(i)		
+	
+	fd, ld = plotsingleday(years[i], months[i], days[i], colorval = colorVal, hourshift = hourshift)
+	#append the found first and last time stamps
+	firstdates.append(fd)
+	lastdates.append(ld)
+
+	#Change the xticks to display hours and minutes only
+#first find the minimum date/time
+orig_mindate = np.min(firstdates)
+# print(orig_mindate.time())
+#then round this down to the hour
+discard = dt.timedelta(minutes=orig_mindate.minute)
+mindate = orig_mindate - discard
+#then make arrays needed to change the ticks
+oldLabels = np.arange(mindate, np.max(lastdates) + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
+newLabels = []
+for d in oldLabels:
+	#add the 'hourshift' amount of hours again to make it show the correct hours
+	newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
+#change the x ticks
+plt.xticks(oldLabels, newLabels, rotation = 40)
 
 plt.legend(loc = 'best', shadow = True).draggable()
 #plt.title('Aantal mensen te S.C.R.E.D. op ' + str(recDate.date()))
