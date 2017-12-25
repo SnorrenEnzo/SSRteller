@@ -296,11 +296,15 @@ def secondsToDates(seconds, current_date, hourshift = 6):
 		h = int(sec / 3600.)
 		m = int(sec / 60. - h * 60.)
 		s = int(sec - m * 60. - h * 3600.)
-		time.append(dt.datetime.combine(current_date, dt.time(h, m, s)) + dt.timedelta(hours = hourshift))
+		
+		if h < 24:
+			time.append(dt.datetime.combine(current_date, dt.time(h, m, s)) + dt.timedelta(hours = hourshift))
+		else:
+			time.append(dt.datetime.combine(current_date, dt.time(h - 24, m, s)) + dt.timedelta(days = 1, hours = hourshift))
 
 	return time
 
-def applyForest(train_set, test_set, train_date, test_date, hourshift):
+def applyForest(train_set, test_set, test_dates, train_date, test_date, hourshift):
 	"""
 	Applies a random forest to the data.
 
@@ -339,15 +343,43 @@ def applyForest(train_set, test_set, train_date, test_date, hourshift):
 	prediction_timeto = secondsToDates(test_set[0] + prediction, test_date, hourshift = hourshift)
 	test_timeto = secondsToDates(test_set[0] + test_set[2], test_date, hourshift = hourshift)
 
-	plt.plot(test_time, prediction_timeto, label = 'Prediction')
-	plt.plot(test_time, test_timeto, label = 'Actual')
 
-		#Change the xticks to display hours and minutes only
-	#first find the minimum date/time
+	#plot with two axes:
+	fig, ax1 = plt.subplots()
+	#plot the prediction data
+	lns1 = ax1.plot(test_time, prediction_timeto, label = 'Prediction', color = '#3E3FE3')
+	lns2 = ax1.plot(test_time, test_timeto, label = 'Actual', color = '#B53BE3')
+
+	#find the minimum date/time
 	starttime = dt.datetime.combine(dt.date.today(), dt.time(20, 0))
 	endtime = dt.datetime.combine(dt.date.today(), dt.time(20, 0)) + dt.timedelta(hours = 9)
+
+		#Change the xticks to display hours and minutes only
+	orig_mindate = np.min(prediction_timeto)
+	#then round this down to the hour
+	discard = dt.timedelta(minutes=orig_mindate.minute)
+	mindate = orig_mindate - discard
+	#then make arrays needed to change the ticks
+	oldLabels = np.arange(mindate, np.max(prediction_timeto) + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
+	newLabels = []
+	for d in oldLabels:
+		newLabels.append(d.strftime("%H:%M"))
+	#change the y ticks
+	plt.yticks(oldLabels, newLabels)
+	plt.ylim(np.min(oldLabels), np.max(oldLabels))
+
+
+	#makes another y-axis
+	ax2 = ax1.twinx()
+
+	#plot amount of people in the building
+	lns3 = ax2.plot(test_dates, test_amount, color = 'r', label = 'Amount')
+	#Changes the colour of the tick labels to match the line colour
+	for tl in ax2.get_yticklabels():
+		tl.set_color('r')
+
+		#Change the xticks to display hours and minutes only
 	orig_mindate = np.min(test_time)
-	# print(orig_mindate.time())
 	#then round this down to the hour
 	discard = dt.timedelta(minutes=orig_mindate.minute)
 	mindate = orig_mindate - discard
@@ -356,12 +388,29 @@ def applyForest(train_set, test_set, train_date, test_date, hourshift):
 	newLabels = []
 	for d in oldLabels:
 		#add the 'hourshift' amount of hours again to make it show the correct hours
-		newLabels.append((d).strftime("%H:%M"))
+		newLabels.append(d.strftime("%H:%M"))
 	#change the x ticks
-	plt.xticks(oldLabels, newLabels, rotation = 40)
+	plt.xticks(oldLabels, newLabels)
 	plt.xlim(np.min(oldLabels), np.max(oldLabels))
+	
 
-	plt.legend(loc = 'best')
+	#auto rotate the labels
+	fig.autofmt_xdate()
+
+	#turn off the grid
+	plt.grid()
+
+	#combines all labels into a single legend
+	lns = lns1 + lns2 + lns3
+	labs = [l.get_label() for l in lns]
+	ax1.legend(lns, labs, loc='upper left')
+
+	ax1.set_xlabel('Time')
+	ax1.set_ylabel('Predicted time')
+	ax2.set_ylabel('Amount of people in the building')
+	plt.title('Predicted time of the building to be full for {0}\nusing Random Forests'.format(test_date))
+
+	plt.savefig('Time until full prediction with random forest {0}.png'.format(test_date), bbox_inches = 'tight', dpi = 200)
 	plt.show()
 	
 	#ts = dt.datetime.fromtimestamp(x_seconds[0]).strftime('%Y-%m-%d %H:%M:%S')
@@ -406,7 +455,7 @@ def timeTo(sec, amount, peakvalue = 300):
 #now = dt.datetime.strptime('10-31-2017 22:15:00', '%m-%d-%Y %H:%M:%S')
 
 train_date = dt.date(2016, 12, 6)
-test_date = dt.date(2017, 11, 28)
+test_date = dt.date(2017, 10, 17)
 
 #download the data again
 #downloadData()
@@ -433,7 +482,14 @@ test_sec = datesToSeconds(test_dates, test_date, hourshift = hourshift)
 train_timeto = timeTo(train_sec, train_amount)
 test_timeto = timeTo(test_sec, test_amount)
 
-applyForest(np.array([train_sec, train_amount, train_timeto]), np.array([test_sec, test_amount, test_timeto]), train_date, test_date, hourshift)
+#slice the test data so that the program does not know when it is actually full
+sliceloc = np.where(test_dates < dt.datetime.combine(test_date, dt.time(22, 30)))
+test_dates = test_dates[sliceloc]
+test_amount = test_amount[sliceloc]
+test_sec = test_sec[sliceloc]
+test_timeto = test_timeto[sliceloc]
+
+applyForest(np.array([train_sec, train_amount, train_timeto]), np.array([test_sec, test_amount, test_timeto]), test_dates, train_date, test_date, hourshift)
 
 #check()
 

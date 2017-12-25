@@ -269,7 +269,6 @@ def plotMultipleDates(date_list):
 		#Change the xticks to display hours and minutes only
 	#first find the minimum date/time
 	orig_mindate = np.min(firstdates)
-	# print(orig_mindate.time())
 	#then round this down to the hour
 	discard = dt.timedelta(minutes=orig_mindate.minute)
 	mindate = orig_mindate - discard
@@ -280,7 +279,10 @@ def plotMultipleDates(date_list):
 		#add the 'hourshift' amount of hours again to make it show the correct hours
 		newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
 	#change the x ticks
-	plt.xticks(oldLabels, newLabels, rotation = 40)
+	plt.xticks(oldLabels, newLabels)
+
+	#auto rotate the labels
+	fig.autofmt_xdate()
 
 	plt.legend(loc = 'best', shadow = True).draggable()
 	plt.title('Aantal mensen te S.C.R.E.D.')
@@ -322,7 +324,6 @@ def plotDates_separate(date_list1, datelist2 = None, saveloc = 'Dinsdagborrels_h
 		starttime = dt.datetime.combine(dt.date.today(), dt.time(20 - hourshift, 0))
 		endtime = dt.datetime.combine(dt.date.today(), dt.time(24 + 4 - hourshift, 0))
 		orig_mindate = starttime
-		# print(orig_mindate.time())
 		#then round this down to the hour
 		discard = dt.timedelta(minutes=orig_mindate.minute)
 		mindate = orig_mindate - discard
@@ -333,8 +334,11 @@ def plotDates_separate(date_list1, datelist2 = None, saveloc = 'Dinsdagborrels_h
 			#add the 'hourshift' amount of hours again to make it show the correct hours
 			newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
 		#change the x ticks
-		plt.xticks(oldLabels, newLabels, rotation = 40)
+		plt.xticks(oldLabels, newLabels)
 		plt.xlim(np.min(oldLabels), np.max(oldLabels))
+
+		#auto rotate the labels
+		fig.autofmt_xdate()
 
 		plt.legend(loc = 'upper right', shadow = True).draggable()
 		plt.title('Aantal mensen te S.C.R.E.D.')
