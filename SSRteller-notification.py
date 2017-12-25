@@ -287,17 +287,32 @@ def datesToSeconds(dates, current_date, hourshift = 6):
 
 	return x_seconds
 
-def applyForest(train_set, test_set, train_date, test_date):
+def secondsToDates(seconds, current_date, hourshift = 6):
+	"""
+
+	"""
+	time = []
+	for sec in seconds:
+		h = int(sec / 3600.)
+		m = int(sec / 60. - h * 60.)
+		s = int(sec - m * 60. - h * 3600.)
+		time.append(dt.datetime.combine(current_date, dt.time(h, m, s)) + dt.timedelta(hours = hourshift))
+
+	return time
+
+def applyForest(train_set, test_set, train_date, test_date, hourshift):
 	"""
 	Applies a random forest to the data.
 
 	Input:
 		train_set (length 3 float array): array containing the training data. The
-		first entry contains the time of day in seconds (note that this time has)
-		been shifted, the second entry the amount of people and the third the number
+		first entry contains the time of day in seconds (note that this time has
+		been shifted), the second entry the amount of people and the third the number
 		of seconds before the peak (300 people) is reached.\n
 		test_set (length 3 float array): the same, but now for the test data.\n
-		train_date, test date (datetime date): the date for the train and test data.
+		train_date, test date (datetime date): the date for the train and test data.\n
+		hourshift (int): the amount of hours the time arrays are shifted
+		back by.
 	"""
 	from sklearn.ensemble import RandomForestClassifier
 	sns.set()
@@ -306,18 +321,46 @@ def applyForest(train_set, test_set, train_date, test_date):
 	#amount = amount[dates < now]
 	#dates = dates[dates < now]
 
+	X_train = np.array([train_set[0], train_set[1]]).T
+	X_test = np.array([test_set[0], test_set[1]]).T
+
 	#create and train the random forest
 	#multi-core CPUs can use: 
 	clf = RandomForestClassifier(n_estimators=100, n_jobs=2)
-	clf.fit(train_set[0][:, None], train_set[2])
+	clf.fit(X_train, train_set[2])
 
 	#print(clf.predict(test_set))
-	print(clf.score(test_set[0][:, None], test_set[2]))
+	print(clf.score(X_test, test_set[2]))
 	
-	prediction = clf.predict(test_set[0][:, None])
+	prediction = clf.predict(X_test)
 
-	plt.plot(test_set[0], test_set[0] - prediction, label = 'Prediction')
-	plt.plot(test_set[0], test_set[0] - test_set[2], label = 'actual')
+	#convert the seconds data back to time
+	test_time = secondsToDates(test_set[0], test_date, hourshift = hourshift)
+	prediction_timeto = secondsToDates(test_set[0] + prediction, test_date, hourshift = hourshift)
+	test_timeto = secondsToDates(test_set[0] + test_set[2], test_date, hourshift = hourshift)
+
+	plt.plot(test_time, prediction_timeto, label = 'Prediction')
+	plt.plot(test_time, test_timeto, label = 'Actual')
+
+		#Change the xticks to display hours and minutes only
+	#first find the minimum date/time
+	starttime = dt.datetime.combine(dt.date.today(), dt.time(20, 0))
+	endtime = dt.datetime.combine(dt.date.today(), dt.time(20, 0)) + dt.timedelta(hours = 9)
+	orig_mindate = np.min(test_time)
+	# print(orig_mindate.time())
+	#then round this down to the hour
+	discard = dt.timedelta(minutes=orig_mindate.minute)
+	mindate = orig_mindate - discard
+	#then make arrays needed to change the ticks
+	oldLabels = np.arange(mindate, np.max(test_time) + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
+	newLabels = []
+	for d in oldLabels:
+		#add the 'hourshift' amount of hours again to make it show the correct hours
+		newLabels.append((d).strftime("%H:%M"))
+	#change the x ticks
+	plt.xticks(oldLabels, newLabels, rotation = 40)
+	plt.xlim(np.min(oldLabels), np.max(oldLabels))
+
 	plt.legend(loc = 'best')
 	plt.show()
 	
@@ -379,16 +422,18 @@ test_date = dt.date(2017, 11, 28)
 train_dates, train_amount = loadData(train_date)
 test_dates, test_amount = loadData(test_date)
 
+#the amount of hours the date arrays are shifted by
+hourshift = 6
 #convert the dates to seconds
-train_sec = datesToSeconds(train_dates, train_date)
-test_sec = datesToSeconds(test_dates, test_date)
+train_sec = datesToSeconds(train_dates, train_date, hourshift = hourshift)
+test_sec = datesToSeconds(test_dates, test_date, hourshift = hourshift)
 
 #now we also make arrays for the time until the building was full. This is what
 #we want to classify
 train_timeto = timeTo(train_sec, train_amount)
 test_timeto = timeTo(test_sec, test_amount)
 
-applyForest(np.array([train_sec, train_amount, train_timeto]), np.array([test_sec, test_amount, test_timeto]), train_date, test_date)
+applyForest(np.array([train_sec, train_amount, train_timeto]), np.array([test_sec, test_amount, test_timeto]), train_date, test_date, hourshift)
 
 #check()
 
