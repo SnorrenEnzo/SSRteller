@@ -48,11 +48,20 @@ def downloadData():
 	print("Downloading data")
 	urlretrieve(url, downloadname)
 	
-def loadData(now):
+def loadData(load_date):
 	"""
-	Load the data of today
+	Load the data of today.
+
+	Input:
+		load_date (datetime or date): the date of day the data should be loaded from
 	"""
 	monthlist = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+	try:
+		#convert the date to a date object if it is not already
+		load_date = load_date.date()
+	except:
+		pass
 	
 	#arrays containing the data
 	dates = []
@@ -72,7 +81,7 @@ def loadData(now):
 			tdatetime = dt.datetime.strptime(tempstring, '%m-%d-%Y %H:%M:%S')
 			
 			#add the date to the array if it is the correct day
-			if tdatetime.date() == now.date() or tdatetime.date() + dt.timedelta(days = 1) == now.date():
+			if tdatetime.date() == load_date or tdatetime.date() == load_date + dt.timedelta(days = 1):
 				#check if the current time is not equal to the previous one. If so,
 				#add the sum of the last few entries
 				if (tdatetime - prevdate) > dt.timedelta(seconds = 0) and prevdate > dt.datetime(1900, 1, 1):
@@ -158,57 +167,6 @@ def findFullTime(dates, amount, nowmoment, diffwidth = 10):
 		n_s = a - (nowmoment - dt.timedelta(minutes = diffwidth))
 		print(n_s)
 	
-def makeplot(dates, amount, now):
-	sns.set()
-
-	#select all dates before our measurement point
-	amount = amount[dates < now]
-	dates = dates[dates < now]
-	
-	#model to be used by the fitting routine
-	def model(x, a, b, c, d):
-		return a*x**3 + b*x**2 + c*x + d
-
-	#convert the dates to seconds for the model
-	x_seconds = np.zeros(len(dates))
-	for i in np.arange(len(dates)):
-		x_seconds[i] = (dates[i]-dt.datetime(1970,1,1)).total_seconds()
-
-	#ts = dt.datetime.fromtimestamp(x_seconds[0]).strftime('%Y-%m-%d %H:%M:%S')
-	#print(ts)
-
-	#apply the fit
-	popt, pcov = curve_fit(model, x_seconds - 1.5e9, amount)
-	#the standard deviation is given by:
-	#perr = np.sqrt(np.diag(pcov))
-	#get the residuals:
-	#residuals = ydata- model(xdata, popt)
-	#to get R^2:
-	#ss_res = np.sum(residuals**2)
-	#ss_tot = np.sum((ydata-np.mean(ydata))**2)
-	#r_squared = 1 - (ss_res / ss_tot)
-
-	#plot with two axes:
-	# fig, ax1 = plt.subplots()
-	#makes another y-axis
-	# ax2 = ax1.twinx()
-	#plots the normal data
-	# lns1 = ax1.plot(dates, amount, color = 'b')
-	#plots the fit
-	# lns2 = ax2.plot(dates, model(x_seconds, *popt), color = 'r')
-
-	# for tl1 in ax1.get_yticklabels():
-	# 	tl1.set_color('b')
-	# for tl2 in ax2.get_yticklabels():
-	# 	tl2.set_color('r')
-
-	print(popt)
-
-	plt.plot(dates, amount, color = 'b')
-	plt.plot(dates, model(x_seconds - 1.5e9, *popt), color = 'r')
-	plt.xticks(rotation = 40)
-	
-	plt.show()
 	
 def plotFulltime(dates, amount, diffwidth = 5):
 	"""
@@ -309,13 +267,128 @@ def check():
 			
 		#wait for a few seconds
 		time.sleep(waittime)
+
+def datesToSeconds(dates, current_date, hourshift = 6):
+	"""
+	Convert dates to seconds for easy application of models. The reference point is
+	00:00 h of the 'current' date. The dates will also be shifted back a few hours, 
+	as most parties/evenings will go beyond 24:00 h.
+	"""
+
+	try:
+		#convert the date to a date object if it is not already
+		current_date = current_date.date()
+	except:
+		pass
+
+	x_seconds = np.zeros(len(dates))
+	for i in np.arange(len(dates)):
+		x_seconds[i] = (dates[i] - dt.timedelta(hours = hourshift) - dt.datetime.combine(current_date, dt.time(0, 0))).total_seconds()
+
+	return x_seconds
+
+def applyForest(train_set, test_set, train_date, test_date):
+	"""
+	Applies a random forest to the data.
+
+	Input:
+		train_set (length 3 float array): array containing the training data. The
+		first entry contains the time of day in seconds (note that this time has)
+		been shifted, the second entry the amount of people and the third the number
+		of seconds before the peak (300 people) is reached.\n
+		test_set (length 3 float array): the same, but now for the test data.\n
+		train_date, test date (datetime date): the date for the train and test data.
+	"""
+	from sklearn.ensemble import RandomForestClassifier
+	sns.set()
+	
+	#select all dates before our measurement point
+	#amount = amount[dates < now]
+	#dates = dates[dates < now]
+
+	#create and train the random forest
+	#multi-core CPUs can use: 
+	clf = RandomForestClassifier(n_estimators=100, n_jobs=2)
+	clf.fit(train_set[0][:, None], train_set[2])
+
+	#print(clf.predict(test_set))
+	print(clf.score(test_set[0][:, None], test_set[2]))
+	
+	prediction = clf.predict(test_set[0][:, None])
+
+	plt.plot(test_set[0], test_set[0] - prediction, label = 'Prediction')
+	plt.plot(test_set[0], test_set[0] - test_set[2], label = 'actual')
+	plt.legend(loc = 'best')
+	plt.show()
+	
+	#ts = dt.datetime.fromtimestamp(x_seconds[0]).strftime('%Y-%m-%d %H:%M:%S')
+	#print(ts)
+	
+	'''
+	print(popt)
+
+	plt.plot(dates, amount, color = 'b')
+	plt.plot(dates, model(x_seconds - 1.5e9, *popt), color = 'r')
+	plt.xticks(rotation = 40)
+	
+	plt.show()
+
+	'''
+
+def timeTo(sec, amount, peakvalue = 300):
+	"""
+	This function makes an array containing the time in seconds until the peak 
+	is reached.
+
+	Input:
+		sec (float array); the time in seconds.\n
+		amount (float array): the amount of people in the building.\n
+		peakvalue (int): the peak amount of which we want to predict the time it 
+		is reached.
+
+	Output:
+		timeto (float array): time until the peakvalue is reached.
+	"""
+
+	#find the moment at which the max of 300 people is reached
+	peakloc = np.where(amount == peakvalue)[0][0]
+
+	timeto = np.zeros(len(sec))
+	for i in np.arange(len(timeto)):
+		timeto[i] = sec[peakloc] - sec[i]
+
+	return timeto
+
    
-now = dt.datetime.strptime('10-31-2017 22:15:00', '%m-%d-%Y %H:%M:%S')
+#now = dt.datetime.strptime('10-31-2017 22:15:00', '%m-%d-%Y %H:%M:%S')
 
-downloadData()
-dates, amount = loadData(now)
+train_date = dt.date(2016, 12, 6)
+test_date = dt.date(2017, 11, 28)
 
-makeplot(dates, amount, now)
+#download the data again
+#downloadData()
+# train_set = np.array(loadData(train_date))
+# test_set = np.array(loadData(test_date))
+
+#the date ranges for the train and test set
+# date_list_train = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
+# date_list_test = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
+
+
+#the arrays containing the training and test data. 
+train_dates, train_amount = loadData(train_date)
+test_dates, test_amount = loadData(test_date)
+
+#convert the dates to seconds
+train_sec = datesToSeconds(train_dates, train_date)
+test_sec = datesToSeconds(test_dates, test_date)
+
+#now we also make arrays for the time until the building was full. This is what
+#we want to classify
+train_timeto = timeTo(train_sec, train_amount)
+test_timeto = timeTo(test_sec, test_amount)
+
+applyForest(np.array([train_sec, train_amount, train_timeto]), np.array([test_sec, test_amount, test_timeto]), train_date, test_date)
 
 #check()
 
