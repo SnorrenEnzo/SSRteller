@@ -310,43 +310,56 @@ def plotDates_separate(date_list1, datelist2 = None, saveloc = 'Dinsdagborrels_h
 	#this shifting is necessary to facilitate plotting different dates in a single plot
 	hourshift = 6
 
+	#array containing the dates that contain good data. These can be used
+	#for training
+	train_dates = []
+
 	#plot all the dates
 	for i in np.arange(len(date_list1)):	
 
+		print('Processing {0}'.format(date_list1[i].date()))
+
 		fig = plt.figure(figsize=(9,6))	
 		
-		fd, ld = plotsingleday(date_list1[i], colorval = colorVal, hourshift = hourshift)
-		if datelist2 is not None:
-			fd, ld = plotsingleday(date_list2[i], colorval = 'b', hourshift = hourshift)
+		try:
+			fd, ld = plotsingleday(date_list1[i], colorval = colorVal, hourshift = hourshift)
+			if datelist2 is not None:
+				fd, ld = plotsingleday(date_list2[i], colorval = 'b', hourshift = hourshift)
 
-			#Change the xticks to display hours and minutes only
-		#first find the minimum date/time
-		starttime = dt.datetime.combine(dt.date.today(), dt.time(20 - hourshift, 0))
-		endtime = dt.datetime.combine(dt.date.today(), dt.time(24 + 4 - hourshift, 0))
-		orig_mindate = starttime
-		#then round this down to the hour
-		discard = dt.timedelta(minutes=orig_mindate.minute)
-		mindate = orig_mindate - discard
-		#then make arrays needed to change the ticks
-		oldLabels = np.arange(mindate, endtime + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
-		newLabels = []
-		for d in oldLabels:
-			#add the 'hourshift' amount of hours again to make it show the correct hours
-			newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
-		#change the x ticks
-		plt.xticks(oldLabels, newLabels)
-		plt.xlim(np.min(oldLabels), np.max(oldLabels))
+				#Change the xticks to display hours and minutes only
+			#first find the minimum date/time
+			starttime = dt.datetime.combine(dt.date.today(), dt.time(20 - hourshift, 0))
+			endtime = dt.datetime.combine(dt.date.today(), dt.time(24 + 4 - hourshift, 0))
+			orig_mindate = starttime
+			#then round this down to the hour
+			discard = dt.timedelta(minutes=orig_mindate.minute)
+			mindate = orig_mindate - discard
+			#then make arrays needed to change the ticks
+			oldLabels = np.arange(mindate, endtime + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
+			newLabels = []
+			for d in oldLabels:
+				#add the 'hourshift' amount of hours again to make it show the correct hours
+				newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
+			#change the x ticks
+			plt.xticks(oldLabels, newLabels)
+			plt.xlim(np.min(oldLabels), np.max(oldLabels))
 
-		#auto rotate the labels
-		fig.autofmt_xdate()
+			#auto rotate the labels
+			fig.autofmt_xdate()
 
-		plt.legend(loc = 'upper right', shadow = True).draggable()
-		plt.title('Aantal mensen te S.C.R.E.D.')
-		plt.xlabel('Tijd')
-		plt.ylabel('Aantal')
-		plt.savefig("{0}img{1}.png".format(saveloc, len(date_list1) - i), dpi = 200)
-		#plt.show()
-		plt.close()
+			plt.legend(loc = 'upper right', shadow = True).draggable()
+			plt.title('Aantal mensen te S.C.R.E.D.')
+			plt.xlabel('Tijd')
+			plt.ylabel('Aantal')
+			plt.savefig("{0}img{1}_{2}.png".format(saveloc, len(date_list1) - i, date_list1[i].date()), dpi = 200)
+			#plt.show()
+			plt.close()
+
+			train_dates.append(str(date_list1[i]))
+		except:
+			print('No data')
+
+	np.savetxt('Dinsdagborrel_train_dates.txt', np.array(train_dates), fmt='%s')
 
 
 #lists containing the dates to be plotted
@@ -360,7 +373,8 @@ for y, m, d in zip(years, months, days):
 	date_list.append(dt.date(y,m,d))
 '''
 #All dinsdagborrels of the autumn of 2017
-date_list1 = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
-date_list2 = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
+# date_list1 = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
+# date_list2 = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
 
-plotDates_separate(date_list1, date_list2, saveloc = 'Dinsdagborrels_herfst_16-17/')
+date_list1 = np.arange(dt.date(2016, 9, 6), dt.date(2017, 6, 20), dt.timedelta(days = 7)).astype(dt.date)
+plotDates_separate(date_list1, saveloc = 'Dinsdagborrels_collegejaar_2016-2017/')
