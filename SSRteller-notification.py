@@ -41,6 +41,9 @@ downloadname = "./teller_log.txt"
 #name of the file containing the dates for the train data
 train_data_name = 'Dinsdagborrel_train_dates.txt'
 
+#the time before which data is thrown away
+mintime = dt.time(20, 0)
+
 
 def downloadData():
 	#list of first and last data points for each day. From these the plotting
@@ -473,7 +476,7 @@ def timeTo(sec, amount, peakvalue = 300):
 
 #instead of a single train date, we will use multiple
 #date_list_train = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
-traindates_str = np.loadtxt(train_data_name, dtype = str)[4:10]
+traindates_str = np.loadtxt(train_data_name, dtype = str)[:1]
 #convert string to date objects
 date_list_train = []
 for dstr in traindates_str:
@@ -495,28 +498,71 @@ test_date = dt.date(2017, 10, 17)
 #the amount of hours the date arrays are shifted by
 hourshift = 6
 
-#the arrays containing the training data
-train_dates = []
-train_amount = []
-train_sec = []
-train_timeto = []
+#the dictionaries containing the training data. We do not use arrays, because
+#the data is of different lengths
+train_dates = {}
+train_amount = {}
+train_sec = {}
+train_timeto = {}
 #loop over all the train dates and append the data
-for d in date_list_train:
+for d, i in zip(date_list_train, np.arange(len(date_list_train))):
 	print('Loading data of {0}'.format(d.date()))
 
 	dates, amount = loadData(d)
 
-	train_dates = np.append(train_dates, dates)
-	train_amount = np.append(train_amount, amount)
+	#slice the data to the point where it is full
+	peakloc = np.where(amount == maxnum)[0][0]
+	dates = dates[:peakloc]
+	amount = amount[:peakloc]
+
+	#cut out the data points which are way to early
+	nottooearly = np.where(dates > dt.datetime.combine(d.date(), mintime))
+	dates = dates[nottooearly]
+	amount = amount[nottooearly]
+
+	train_dates[i] = dates
+	train_amount[i] = amount
 
 	#convert the dates to seconds
 	sec = datesToSeconds(dates, d, hourshift = hourshift)
-	train_sec = np.append(train_sec, sec)
+	train_sec[i] = sec
 
 	#now we also make arrays for the time until the building was full. This is what
 	#we want to classify
-	train_timeto = np.append(train_timeto, timeTo(sec, amount))
+	train_timeto[i] = timeTo(sec, amount)
 
+
+	#here we extract certain features from the training data
+k = 0 #TEMPORARY ITERATOR
+
+#Feature 1 and 2: averages and derivates of time bins, starting at mintime
+#the range of datetimes that is used as the bin edges
+timerange = np.arange(dt.datetime.combine(date_list_train[k].date(), mintime), dt.datetime.combine((date_list_train[k] + dt.timedelta(days = 1)).date(), dt.time(3, 0)), dt.timedelta(minutes = 30)).astype(dt.datetime)
+avg = np.zeros(len(timerange)-1) * np.nan
+deriv = np.zeros(len(timerange)-1) * np.nan
+
+for i in np.arange(len(timerange) - 1):
+	#slice the train_amount array between timerange entry i and i+1
+	sliceloc = (train_dates[k] > timerange[i]) * (train_dates[k] < timerange[i+1])
+	
+	#check if there still is data
+	if np.sum(sliceloc) > 0:
+		sliced_amount = train_amount[k][sliceloc]
+		#obtain the average 
+		avg[i] = np.mean(sliced_amount)
+
+		#slice the seconds array as well
+		sliced_sec = train_sec[k][sliceloc]
+		#obtain the derivative
+		deriv[i] = (sliced_amount[::-1][0] - sliced_amount[0]) / (sliced_sec[::-1][0] - sliced_sec[0])
+
+print(avg)
+print(deriv)
+
+plt.plot(train_dates[k], train_amount[k])
+plt.show()
+
+'''
 # train_dates, train_amount = loadData(train_date)
 	#now do the same for the test data
 test_dates, test_amount = loadData(test_date)
@@ -535,10 +581,11 @@ test_amount = test_amount[sliceloc]
 test_sec = test_sec[sliceloc]
 test_timeto = test_timeto[sliceloc]
 
+
 applyForest(np.array([train_sec, train_amount, train_timeto]), np.array([test_sec, test_amount, test_timeto]), test_dates, date_list_train[0], test_date, hourshift)
 
 #check()
-
+'''
 
 
 
