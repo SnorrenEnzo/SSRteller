@@ -15,6 +15,9 @@ import tkinter as tk
 from tkinter import ttk
 #used for model fitting
 from scipy.optimize import curve_fit
+#for interpreting random forests etc
+from treeinterpreter import treeinterpreter as ti
+
 plt.close()
 
 '''
@@ -34,6 +37,9 @@ maxnum = 300
 
 #name where the data will be downloaded
 downloadname = "./teller_log.txt"
+
+#name of the file containing the dates for the train data
+train_data_name = 'Dinsdagborrel_train_dates.txt'
 
 
 def downloadData():
@@ -314,7 +320,9 @@ def applyForest(train_set, test_set, test_dates, train_date, test_date, hourshif
 		been shifted), the second entry the amount of people and the third the number
 		of seconds before the peak (300 people) is reached.\n
 		test_set (length 3 float array): the same, but now for the test data.\n
-		train_date, test date (datetime date): the date for the train and test data.\n
+		test_dates (datetime array): datetime objects for each data point 
+		in the test data.
+		train_date, test_date (datetime date): the date for the train and test data.\n
 		hourshift (int): the amount of hours the time arrays are shifted
 		back by.
 	"""
@@ -330,7 +338,7 @@ def applyForest(train_set, test_set, test_dates, train_date, test_date, hourshif
 
 	#create and train the random forest
 	#multi-core CPUs can use: 
-	clf = RandomForestClassifier(n_estimators=100, n_jobs=2)
+	clf = RandomForestClassifier(n_estimators=50, n_jobs=3)
 	clf.fit(X_train, train_set[2])
 
 	#print(clf.predict(test_set))
@@ -398,7 +406,7 @@ def applyForest(train_set, test_set, test_dates, train_date, test_date, hourshif
 	fig.autofmt_xdate()
 
 	#turn off the grid
-	plt.grid()
+	#plt.grid()
 
 	#combines all labels into a single legend
 	lns = lns1 + lns2 + lns3
@@ -410,21 +418,24 @@ def applyForest(train_set, test_set, test_dates, train_date, test_date, hourshif
 	ax2.set_ylabel('Amount of people in the building')
 	plt.title('Predicted time of the building to be full for {0}\nusing Random Forests'.format(test_date))
 
-	plt.savefig('Time until full prediction with random forest {0}.png'.format(test_date), bbox_inches = 'tight', dpi = 200)
+	plt.savefig('{0} Time until full prediction with RF - more train data.png'.format(test_date), bbox_inches = 'tight', dpi = 200)
 	plt.show()
 	
 	#ts = dt.datetime.fromtimestamp(x_seconds[0]).strftime('%Y-%m-%d %H:%M:%S')
 	#print(ts)
-	
 	'''
-	print(popt)
+		#here we implement code from:
+		# http://blog.datadive.net/random-forest-interpretation-with-scikit-learn/
+		#it can be used to interpret the tree chosen by the random forests method
+	prediction, bias, contributions = ti.predict(clf, X_test)
 
-	plt.plot(dates, amount, color = 'b')
-	plt.plot(dates, model(x_seconds - 1.5e9, *popt), color = 'r')
-	plt.xticks(rotation = 40)
-	
-	plt.show()
-
+	for i in range(len(X_test)):
+		print("Instance", i)
+		print("Bias (trainset mean)", bias[i])
+		print("Feature contributions:")
+		for c, feature in sorted(zip(contributions[i], test_dates), key=lambda x: -abs(x[0])):
+			print(feature, round(c, 2))
+		print("-"*20 )
 	'''
 
 def timeTo(sec, amount, peakvalue = 300):
@@ -442,8 +453,11 @@ def timeTo(sec, amount, peakvalue = 300):
 		timeto (float array): time until the peakvalue is reached.
 	"""
 
-	#find the moment at which the max of 300 people is reached
-	peakloc = np.where(amount == peakvalue)[0][0]
+	try:
+		#find the moment at which the max of 300 people is reached
+		peakloc = np.where(amount == peakvalue)[0][0]
+	except:
+		return np.zeros(len(sec)) + sec[0]
 
 	timeto = np.zeros(len(sec))
 	for i in np.arange(len(timeto)):
@@ -454,7 +468,19 @@ def timeTo(sec, amount, peakvalue = 300):
    
 #now = dt.datetime.strptime('10-31-2017 22:15:00', '%m-%d-%Y %H:%M:%S')
 
-train_date = dt.date(2016, 12, 6)
+# train_date = dt.date(2016, 12, 6)
+
+
+#instead of a single train date, we will use multiple
+#date_list_train = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
+traindates_str = np.loadtxt(train_data_name, dtype = str)[4:10]
+#convert string to date objects
+date_list_train = []
+for dstr in traindates_str:
+	date_list_train.append(dt.datetime.strptime(dstr[0], '%Y-%m-%d'))
+date_list_train = np.array(date_list_train)
+
+#the test date
 test_date = dt.date(2017, 10, 17)
 
 #download the data again
@@ -466,20 +492,40 @@ test_date = dt.date(2017, 10, 17)
 # date_list_train = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
 # date_list_test = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
 
-
-#the arrays containing the training and test data. 
-train_dates, train_amount = loadData(train_date)
-test_dates, test_amount = loadData(test_date)
-
 #the amount of hours the date arrays are shifted by
 hourshift = 6
-#convert the dates to seconds
-train_sec = datesToSeconds(train_dates, train_date, hourshift = hourshift)
+
+#the arrays containing the training data
+train_dates = []
+train_amount = []
+train_sec = []
+train_timeto = []
+#loop over all the train dates and append the data
+for d in date_list_train:
+	print('Loading data of {0}'.format(d.date()))
+
+	dates, amount = loadData(d)
+
+	train_dates = np.append(train_dates, dates)
+	train_amount = np.append(train_amount, amount)
+
+	#convert the dates to seconds
+	sec = datesToSeconds(dates, d, hourshift = hourshift)
+	train_sec = np.append(train_sec, sec)
+
+	#now we also make arrays for the time until the building was full. This is what
+	#we want to classify
+	train_timeto = np.append(train_timeto, timeTo(sec, amount))
+
+# train_dates, train_amount = loadData(train_date)
+	#now do the same for the test data
+test_dates, test_amount = loadData(test_date)
+
+#convert the dates to seconds	
 test_sec = datesToSeconds(test_dates, test_date, hourshift = hourshift)
 
 #now we also make arrays for the time until the building was full. This is what
 #we want to classify
-train_timeto = timeTo(train_sec, train_amount)
 test_timeto = timeTo(test_sec, test_amount)
 
 #slice the test data so that the program does not know when it is actually full
@@ -489,7 +535,7 @@ test_amount = test_amount[sliceloc]
 test_sec = test_sec[sliceloc]
 test_timeto = test_timeto[sliceloc]
 
-applyForest(np.array([train_sec, train_amount, train_timeto]), np.array([test_sec, test_amount, test_timeto]), test_dates, train_date, test_date, hourshift)
+applyForest(np.array([train_sec, train_amount, train_timeto]), np.array([test_sec, test_amount, test_timeto]), test_dates, date_list_train[0], test_date, hourshift)
 
 #check()
 
