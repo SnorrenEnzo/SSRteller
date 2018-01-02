@@ -313,42 +313,55 @@ def secondsToDates(seconds, current_date, hourshift = 6):
 
 	return time
 
-def applyForest(train_set, test_set, test_dates, train_date, test_date, hourshift):
+def applyForest(X_train, X_test, Y_train, Y_test, test_dates, train_date, test_date, hourshift):
 	"""
 	Applies a random forest to the data.
 
 	Input:
-		train_set (length 3 float array): array containing the training data. The
-		first entry contains the time of day in seconds (note that this time has
-		been shifted), the second entry the amount of people and the third the number
-		of seconds before the peak (300 people) is reached.\n
-		test_set (length 3 float array): the same, but now for the test data.\n
-		test_dates (datetime array): datetime objects for each data point 
-		in the test data.
+		X_train, X_test (2D float arrays): arrays containing the features for
+		the training and test sets.
 		train_date, test_date (datetime date): the date for the train and test data.\n
 		hourshift (int): the amount of hours the time arrays are shifted
 		back by.
 	"""
 	from sklearn.ensemble import RandomForestClassifier
+	#for handling mission X data
+	from sklearn.preprocessing import Imputer
 	sns.set()
+
+		#preprocess the data: take out the nans
+	# Create our imputer to replace missing values with the mean e.g.
+	imp = Imputer(missing_values='NaN', strategy='mean', axis=0)
+	imp = imp.fit(X_train)
+
+	# Impute our data, then train
+	X_train_imp = imp.transform(X_train)
+
+	# Impute each test item, then predict
+	X_test_imp = imp.transform(X_test)
+
 	
 	#select all dates before our measurement point
 	#amount = amount[dates < now]
 	#dates = dates[dates < now]
 
-	X_train = np.array([train_set[0], train_set[1]]).T
-	X_test = np.array([test_set[0], test_set[1]]).T
+	# X_train = np.array([train_set[0], train_set[1]]).T
+	# X_test = np.array([test_set[0], test_set[1]]).T
 
 	#create and train the random forest
 	#multi-core CPUs can use: 
 	clf = RandomForestClassifier(n_estimators=50, n_jobs=3)
-	clf.fit(X_train, train_set[2])
+	clf.fit(X_train_imp, Y_train)
 
 	#print(clf.predict(test_set))
-	print(clf.score(X_test, test_set[2]))
+	#print(clf.score(X_test, test_set[2]))
 	
-	prediction = clf.predict(X_test)
+	prediction = clf.predict(X_test_imp)
 
+	print('Prediction: {0}'.format(prediction))
+	print('Actual value: {0}'.format(Y_test))
+
+	'''
 	#convert the seconds data back to time
 	test_time = secondsToDates(test_set[0], test_date, hourshift = hourshift)
 	prediction_timeto = secondsToDates(test_set[0] + prediction, test_date, hourshift = hourshift)
@@ -427,6 +440,7 @@ def applyForest(train_set, test_set, test_dates, train_date, test_date, hourshif
 	#ts = dt.datetime.fromtimestamp(x_seconds[0]).strftime('%Y-%m-%d %H:%M:%S')
 	#print(ts)
 	'''
+	'''
 		#here we implement code from:
 		# http://blog.datadive.net/random-forest-interpretation-with-scikit-learn/
 		#it can be used to interpret the tree chosen by the random forests method
@@ -455,11 +469,11 @@ def timeTo(sec, amount, peakvalue = 300):
 	Output:
 		timeto (float array): time until the peakvalue is reached.
 	"""
+	loc = np.where(amount == peakvalue)
 
-	try:
-		#find the moment at which the max of 300 people is reached
+	if len(loc[0]) > 0:
 		peakloc = np.where(amount == peakvalue)[0][0]
-	except:
+	else:
 		return np.zeros(len(sec)) + sec[0]
 
 	timeto = np.zeros(len(sec))
@@ -467,6 +481,35 @@ def timeTo(sec, amount, peakvalue = 300):
 		timeto[i] = sec[peakloc] - sec[i]
 
 	return timeto
+
+def getFeatures(train_date, dates, amount, sec):
+	"""
+	Extracts desired features from the data
+	"""
+	#Feature 1 and 2: averages and derivates of time bins, starting at mintime
+	#the range of datetimes that is used as the bin edges
+	timerange = np.arange(dt.datetime.combine(train_date, mintime), dt.datetime.combine((train_date + dt.timedelta(days = 1)), dt.time(3, 0)), dt.timedelta(minutes = 30)).astype(dt.datetime)
+
+	avg = np.zeros(len(timerange)-1) * np.nan
+	deriv = np.zeros(len(timerange)-1) * np.nan
+
+	for i in np.arange(len(timerange) - 1):
+		#slice the train_amount array between timerange entry i and i+1
+		sliceloc = (dates > timerange[i]) * (dates < timerange[i+1])
+		
+		#check if there still is data
+		if np.sum(sliceloc) > 0:
+			sliced_amount = amount[sliceloc]
+			#obtain the average 
+			avg[i] = np.mean(sliced_amount)
+
+			#slice the seconds array as well
+			sliced_sec = sec[sliceloc]
+
+			#obtain the derivative
+			deriv[i] = (sliced_amount[::-1][0] - sliced_amount[0]) / (sliced_sec[::-1][0] - sliced_sec[0])
+
+	return np.append(avg, deriv)
 
    
 #now = dt.datetime.strptime('10-31-2017 22:15:00', '%m-%d-%Y %H:%M:%S')
@@ -476,7 +519,7 @@ def timeTo(sec, amount, peakvalue = 300):
 
 #instead of a single train date, we will use multiple
 #date_list_train = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
-traindates_str = np.loadtxt(train_data_name, dtype = str)[:1]
+traindates_str = np.loadtxt(train_data_name, dtype = str)
 #convert string to date objects
 date_list_train = []
 for dstr in traindates_str:
@@ -503,66 +546,56 @@ hourshift = 6
 train_dates = {}
 train_amount = {}
 train_sec = {}
-train_timeto = {}
+#the maximum amount of people in the building at that date
+train_max = []
+#the time at which the building is full, in seconds
+train_fulltime = []
 #loop over all the train dates and append the data
 for d, i in zip(date_list_train, np.arange(len(date_list_train))):
 	print('Loading data of {0}'.format(d.date()))
 
 	dates, amount = loadData(d)
 
-	#slice the data to the point where it is full
-	peakloc = np.where(amount == maxnum)[0][0]
-	dates = dates[:peakloc]
-	amount = amount[:peakloc]
+	#check if there is actually any useful data
+	if len(dates) > 10:
+		#find the max
+		maxamount = np.max(amount)
+		train_max = np.append(train_max, maxamount)
 
-	#cut out the data points which are way to early
-	nottooearly = np.where(dates > dt.datetime.combine(d.date(), mintime))
-	dates = dates[nottooearly]
-	amount = amount[nottooearly]
+		#cut out the data points which are way to early
+		nottooearly = np.where(dates > dt.datetime.combine(d.date(), mintime))
+		dates = dates[nottooearly]
+		amount = amount[nottooearly]
 
-	train_dates[i] = dates
-	train_amount[i] = amount
+		#slice the data to the point where it is full
+		peakloc = np.where(amount == maxamount)[0][0]
+		dates = dates[:peakloc]
+		amount = amount[:peakloc]
 
-	#convert the dates to seconds
-	sec = datesToSeconds(dates, d, hourshift = hourshift)
-	train_sec[i] = sec
+		train_dates[i] = dates
+		train_amount[i] = amount
 
-	#now we also make arrays for the time until the building was full. This is what
-	#we want to classify
-	train_timeto[i] = timeTo(sec, amount)
+		sec = datesToSeconds(dates, d, hourshift = hourshift)
+		train_sec[i] = sec
+
+		#now we also make arrays for the time until the max is reached. This is what
+		#we want to classify
+		#train_timeto[i] = timeTo(sec, amount, peakvalue = maxamount)
+
+		#get the time of the peak (the last entry in the sec array)
+		train_fulltime = np.append(train_fulltime, sec[-1::][0])
 
 
 	#here we extract certain features from the training data
-k = 0 #TEMPORARY ITERATOR
+#the matrix containing all the features
+train_features = []
+for k in train_dates.keys():
+	train_features.append(getFeatures(date_list_train[k].date(), train_dates[k], train_amount[k], train_sec[k]))
 
-#Feature 1 and 2: averages and derivates of time bins, starting at mintime
-#the range of datetimes that is used as the bin edges
-timerange = np.arange(dt.datetime.combine(date_list_train[k].date(), mintime), dt.datetime.combine((date_list_train[k] + dt.timedelta(days = 1)).date(), dt.time(3, 0)), dt.timedelta(minutes = 30)).astype(dt.datetime)
-avg = np.zeros(len(timerange)-1) * np.nan
-deriv = np.zeros(len(timerange)-1) * np.nan
+train_features = np.array(train_features)
+train_features = np.reshape(train_features, (len(train_dates.keys()), -1))
 
-for i in np.arange(len(timerange) - 1):
-	#slice the train_amount array between timerange entry i and i+1
-	sliceloc = (train_dates[k] > timerange[i]) * (train_dates[k] < timerange[i+1])
-	
-	#check if there still is data
-	if np.sum(sliceloc) > 0:
-		sliced_amount = train_amount[k][sliceloc]
-		#obtain the average 
-		avg[i] = np.mean(sliced_amount)
 
-		#slice the seconds array as well
-		sliced_sec = train_sec[k][sliceloc]
-		#obtain the derivative
-		deriv[i] = (sliced_amount[::-1][0] - sliced_amount[0]) / (sliced_sec[::-1][0] - sliced_sec[0])
-
-print(avg)
-print(deriv)
-
-plt.plot(train_dates[k], train_amount[k])
-plt.show()
-
-'''
 # train_dates, train_amount = loadData(train_date)
 	#now do the same for the test data
 test_dates, test_amount = loadData(test_date)
@@ -570,22 +603,24 @@ test_dates, test_amount = loadData(test_date)
 #convert the dates to seconds	
 test_sec = datesToSeconds(test_dates, test_date, hourshift = hourshift)
 
-#now we also make arrays for the time until the building was full. This is what
-#we want to classify
-test_timeto = timeTo(test_sec, test_amount)
+#obtain the time the building was full
+test_fulltime = test_sec[np.where(test_amount == np.max(test_amount))[0][0]]
 
 #slice the test data so that the program does not know when it is actually full
 sliceloc = np.where(test_dates < dt.datetime.combine(test_date, dt.time(22, 30)))
 test_dates = test_dates[sliceloc]
 test_amount = test_amount[sliceloc]
 test_sec = test_sec[sliceloc]
-test_timeto = test_timeto[sliceloc]
+
+#obtain features
+test_features = np.array([getFeatures(test_date, test_dates, test_amount, test_sec)])
 
 
-applyForest(np.array([train_sec, train_amount, train_timeto]), np.array([test_sec, test_amount, test_timeto]), test_dates, date_list_train[0], test_date, hourshift)
+
+applyForest(train_features, test_features, train_fulltime, test_fulltime, test_dates, date_list_train[0], test_date, hourshift)
 
 #check()
-'''
+
 
 
 
