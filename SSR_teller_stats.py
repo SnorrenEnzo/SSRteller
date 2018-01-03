@@ -355,11 +355,11 @@ def plotDates_separate(date_list1, datelist2 = None, saveloc = 'Dinsdagborrels_h
 			#plt.show()
 			plt.close()
 
-			train_dates.append(str(date_list1[i]))
+			train_dates.append(str(date_list1[i].date()))
 		except:
 			print('No data')
 
-	np.savetxt('Dinsdagborrel_train_dates.txt', np.array(train_dates), fmt='%s')
+	#np.savetxt('Dinsdagborrel_train_dates.txt', np.array(train_dates), fmt='%s')
 
 
 #lists containing the dates to be plotted
@@ -376,5 +376,8 @@ for y, m, d in zip(years, months, days):
 # date_list1 = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
 # date_list2 = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
 
+#date range for the training data of the random forest
 date_list1 = np.arange(dt.date(2016, 9, 6), dt.date(2017, 6, 20), dt.timedelta(days = 7)).astype(dt.date)
-plotDates_separate(date_list1, saveloc = 'Dinsdagborrels_collegejaar_2016-2017/')
+#data range for the test data
+#date_list1 = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
+plotDates_separate(date_list1, saveloc = 'Dinsdagborrels_collegejaar_2017-2018/')

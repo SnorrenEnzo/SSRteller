@@ -15,8 +15,6 @@ import tkinter as tk
 from tkinter import ttk
 #used for model fitting
 from scipy.optimize import curve_fit
-#for interpreting random forests etc
-from treeinterpreter import treeinterpreter as ti
 
 plt.close()
 
@@ -317,7 +315,7 @@ def secondsToDates(seconds, current_date, hourshift = 6):
 
 	return time
 
-def applyForest(X_train, X_test, Y_train, Y_test, train_dates, test_dates, hourshift):
+def applyForest(X_train, X_test, Y_train, Y_test, train_dates, test_dates, hourshift, feat_names, append_results = True):
 	"""
 	Applies a random forest to the data.
 
@@ -328,16 +326,29 @@ def applyForest(X_train, X_test, Y_train, Y_test, train_dates, test_dates, hours
 		desired outcome for the training and test set respectively.\n
 		train_date, test_date (datetime date): the date for the train and test data.\n
 		hourshift (int): the amount of hours the time arrays are shifted
-		back by.
+		back by.\n
+		feat_names (str array): names of the features used.\n
+		append_results (boolean): whether to append the difference between the 
+		predicted and true end time for the test data to a csv file.
 	"""
 	from sklearn.ensemble import RandomForestClassifier
 	#for handling mission X data
 	from sklearn.preprocessing import Imputer
+	import pandas as pd
+	#for interpreting random forests etc
+	from treeinterpreter import treeinterpreter as ti
+
 	sns.set()
+
+	#preprocessing strategy
+	strat = 'mean'
+
+	#the type of features used 
+	feat_type = 'avg,deriv,n=1000,differentTestData'
 
 		#preprocess the data: take out the nans
 	# Create our imputer to replace missing values with the mean e.g.
-	imp = Imputer(missing_values='NaN', strategy='mean', axis=0)
+	imp = Imputer(missing_values='NaN', strategy=strat, axis=0)
 	imp = imp.fit(X_train)
 
 	# Impute our data, then train
@@ -346,26 +357,60 @@ def applyForest(X_train, X_test, Y_train, Y_test, train_dates, test_dates, hours
 	# Impute each test item, then predict
 	X_test_imp = imp.transform(X_test)
 
-	#try the random forest multiple times
-	n_times = 1
-	for i in np.arange(n_times):
-		print('#{0}'.format(i))
-		#create and train the random forest
-		#multi-core CPUs can use: 
-		clf = RandomForestClassifier(n_estimators=50, n_jobs=3)
-		clf.fit(X_train_imp, Y_train)
+	#create and train the random forest
+	#multi-core CPUs can use: 
+	clf = RandomForestClassifier(n_estimators=1000, n_jobs=3)
+	clf.fit(X_train_imp, Y_train)
 
-		#print(clf.predict(test_set))
-		#print(clf.score(X_test, test_set[2]))
-		
-		prediction = clf.predict(X_test_imp)
+	#print(clf.predict(test_set))
+	#print(clf.score(X_test, test_set[2]))
+	
+	prediction = clf.predict(X_test_imp)
 
-		#print the prediction and comparison with truth
-		for j in np.arange(len(prediction)):
-			print('\nDate: {0}'.format(test_dates[j].date()))
-			print('Prediction: {0}'.format(prediction[j]))
-			print('Actual value: {0}'.format(Y_test[j]))
-			print('Time difference: {0} min'.format(round((prediction[j] - Y_test[j])/60., 1)))
+	#print the prediction and comparison with truth
+	predic_offset = np.zeros(len(prediction))
+	for j in np.arange(len(prediction)):
+		print('\nDate: {0}'.format(test_dates[j].date()))
+		offset = (Y_test[j] - prediction[j])/60.
+		print('Time difference: {0} min'.format(round(offset, 1)))
+		predic_offset[j] = offset
+
+	if append_results:
+		#write the prediction offset to a csv
+		csv_input = pd.read_csv('Prediction_offset_results.csv')
+		csv_input['Strat={0}|{1}'.format(strat, feat_type)] = predic_offset
+		csv_input.to_csv('Prediction_offset_results.csv', index=False)
+
+
+	importances = clf.feature_importances_
+	indices = np.argsort(importances)[::-1]
+	print(feat_names)
+	print(importances)
+	print(np.shape(X_train))
+	print(np.shape(importances), np.shape(range(X_test.shape[1])))
+	std = np.std([tree.feature_importances_ for tree in clf.estimators_], axis=0)
+	plt.bar(range(X_test.shape[1]), importances,color="r", yerr=std, align="center")
+	#plt.xticks(range(X_test.shape[1]), indices)
+	#plt.xlim([-1, X_test.shape[1]])
+	plt.show()
+
+	'''
+		#here we implement code from:
+		# -
+		#it can be used to interpret the tree chosen by the random forests method
+	ti_pred, bias, contributions = ti.predict(clf, X_test_imp)
+	print('contributions')
+	print(np.shape(contributions))
+	print(len(X_test))
+
+	for i in range(len(X_test)):
+		print("Instance", i)
+		print("Bias (trainset mean)", bias[i])
+		print("Feature contributions:")
+		for c, feat in zip(contributions[i], feat_names):
+			print(feat, c)#round(c, 2)
+		print("-"*20 )
+	'''
 
 	'''
 	#convert the seconds data back to time
@@ -446,20 +491,7 @@ def applyForest(X_train, X_test, Y_train, Y_test, train_dates, test_dates, hours
 	#ts = dt.datetime.fromtimestamp(x_seconds[0]).strftime('%Y-%m-%d %H:%M:%S')
 	#print(ts)
 	'''
-	'''
-		#here we implement code from:
-		# http://blog.datadive.net/random-forest-interpretation-with-scikit-learn/
-		#it can be used to interpret the tree chosen by the random forests method
-	prediction, bias, contributions = ti.predict(clf, X_test)
-
-	for i in range(len(X_test)):
-		print("Instance", i)
-		print("Bias (trainset mean)", bias[i])
-		print("Feature contributions:")
-		for c, feature in sorted(zip(contributions[i], test_dates), key=lambda x: -abs(x[0])):
-			print(feature, round(c, 2))
-		print("-"*20 )
-	'''
+	
 
 def timeTo(sec, amount, peakvalue = 300):
 	"""
@@ -560,7 +592,7 @@ def getFeatures(train_date, dates, amount, sec):
 	"""
 	#Feature 1 and 2: averages and derivates of time bins, starting at mintime
 	#the range of datetimes that is used as the bin edges
-	timerange = np.arange(dt.datetime.combine(train_date, mintime), dt.datetime.combine((train_date + dt.timedelta(days = 1)), dt.time(3, 0)), dt.timedelta(minutes = 30)).astype(dt.datetime)
+	timerange = np.arange(dt.datetime.combine(train_date, mintime), dt.datetime.combine((train_date + dt.timedelta(days = 1)), dt.time(3, 0)), dt.timedelta(minutes = 15)).astype(dt.datetime)
 
 	avg = np.zeros(len(timerange)-1) * np.nan
 	deriv = np.zeros(len(timerange)-1) * np.nan
@@ -586,8 +618,13 @@ def getFeatures(train_date, dates, amount, sec):
    
 #now = dt.datetime.strptime('10-31-2017 22:15:00', '%m-%d-%Y %H:%M:%S')
 
-# train_date = dt.date(2016, 12, 6)
-
+#obtain the names of the features
+fdate = dt.date(2017, 10, 5)
+feat_timerange = np.arange(dt.datetime.combine(fdate, mintime), dt.datetime.combine((fdate + dt.timedelta(days = 1)), dt.time(3, 0)), dt.timedelta(minutes = 15)).astype(dt.datetime)
+feat_names = []
+for f in ['avg', 'deriv']:
+	for t in feat_timerange:
+		feat_names.append('{0} {1}'.format(f, t.time()))
 
 #The dates of the training data
 #date_list_train = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
@@ -595,7 +632,7 @@ traindates_str = np.loadtxt(train_data_name, dtype = str)
 #convert string to date objects
 date_list_train = []
 for dstr in traindates_str:
-	date_list_train.append(dt.datetime.strptime(dstr[0], '%Y-%m-%d'))
+	date_list_train.append(dt.datetime.strptime(dstr, '%Y-%m-%d'))
 date_list_train = np.array(date_list_train)
 
 #The dates of the test data
@@ -604,7 +641,7 @@ testdates_str = np.loadtxt(test_data_name, dtype = str)
 #convert string to date objects
 date_list_test = []
 for dstr in testdates_str:
-	date_list_test.append(dt.datetime.strptime(dstr[0], '%Y-%m-%d'))
+	date_list_test.append(dt.datetime.strptime(dstr, '%Y-%m-%d'))
 date_list_test = np.array(date_list_test)
 
 
@@ -624,10 +661,15 @@ test_dates, test_amount, test_sec, test_max, test_fulltime = loadRFdata(date_lis
 
 #slice the test data so that the program does not know when it is actually full
 for k in test_dates.keys():
-	sliceloc = np.where(test_dates[k] < dt.datetime.combine(test_dates[k][0].date(), dt.time(22, 30)))
+	#sliceloc = np.where(test_dates[k] < dt.datetime.combine(test_dates[k][0].date(), dt.time(22, 30)))
+	#location of the peak
+	peakloc = np.argmax(test_amount[k])
+	#slice to everything earlier than the peak and with an amount lower than the peak
+	sliceloc = (test_amount[k] < peakloc) * (test_amount[k] < maxnum - 60)
 	test_dates[k] = test_dates[k][sliceloc]
 	test_amount[k] = test_amount[k][sliceloc]
 	test_sec[k] = test_sec[k][sliceloc]
+
 
 	#Extract features from the test data
 #the matrix containing all the features
@@ -637,11 +679,9 @@ for k in test_dates.keys():
 test_features = np.reshape(np.array(test_features), (len(test_dates.keys()), -1))
 
 
-applyForest(train_features, test_features, train_fulltime, test_fulltime, date_list_train, date_list_test, hourshift)
+applyForest(train_features, test_features, train_fulltime, test_fulltime, date_list_train, date_list_test, hourshift, feat_names, append_results = True)
 
 
 #continuously loop the program
 #check()
-
-
 
