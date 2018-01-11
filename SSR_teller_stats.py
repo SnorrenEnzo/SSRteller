@@ -362,6 +362,37 @@ def plotDates_separate(date_list1, datelist2 = None, saveloc = 'Dinsdagborrels_h
 	#np.savetxt('Dinsdagborrel_train_dates.txt', np.array(train_dates), fmt='%s')
 
 
+def plotOneDay(saveloc = './Plots/', hourshift = 6):
+	"""
+	Plots a single day including saving it and adding labels etc
+	"""
+	
+	
+	starttime, endtime = plotsingleday(dt.datetime(2017, 12, 31), colorval = 'b', hourshift = hourshift)	
+
+		#Change the xticks to display hours and minutes only
+	#first find the minimum date/time
+	#starttime = dt.datetime.combine(dt.date.today(), dt.time(20 - hourshift, 0))
+	#endtime = dt.datetime.combine(dt.date.today(), dt.time(24 + 4 - hourshift, 0))
+
+	orig_mindate = starttime
+	#then round this down to the hour
+	discard = dt.timedelta(minutes=orig_mindate.minute)
+	mindate = orig_mindate - discard
+	#then make arrays needed to change the ticks
+	oldLabels = np.arange(mindate, endtime + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
+	newLabels = []
+	for d in oldLabels:
+		#add the 'hourshift' amount of hours again to make it show the correct hours
+		newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
+	#rotate xticks and change the labels
+	plt.xticks(oldLabels, newLabels)
+	plt.title('Aantal mensen te S.C.R.E.D.')
+	plt.xlabel('Tijd')
+	plt.ylabel('Aantal')
+	plt.savefig("{0}plot.png".format(saveloc), dpi = 200, bbox_inches = 'tight')
+	plt.show()
+
 #lists containing the dates to be plotted
 '''
 #KSF 2016 and 2017
@@ -377,7 +408,11 @@ for y, m, d in zip(years, months, days):
 # date_list2 = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
 
 #date range for the training data of the random forest
-date_list1 = np.arange(dt.date(2016, 9, 6), dt.date(2017, 6, 20), dt.timedelta(days = 7)).astype(dt.date)
+#date_list1 = np.arange(dt.date(2016, 9, 6), dt.date(2017, 6, 20), dt.timedelta(days = 7)).astype(dt.date)
 #data range for the test data
 #date_list1 = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
-plotDates_separate(date_list1, saveloc = 'Dinsdagborrels_collegejaar_2017-2018/')
+#plotDates_separate(date_list1, saveloc = 'Dinsdagborrels_collegejaar_2017-2018/')
+
+
+	#plot a single date
+plotOneDay()
