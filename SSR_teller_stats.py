@@ -270,7 +270,7 @@ class processTeller(object):
 			except:
 				print('No data')
 
-	def barGraphWeekday(self):
+	def barGraphWeekday(self, loadolddata = False):
 		"""
 		Plots a bar graph of maximum number of people on certain days 
 		throughout the year
@@ -289,37 +289,52 @@ class processTeller(object):
 		dinsdag: 4-9-2018
 		vrijdag: 7-9-2018
 		'''
-		firstdate = dt.date(2016, 9, 6)
-		lastdate = dt.date(2017, 4, 4)
-		
-		#array containing all the tuesday dates and max values
-		tuesdaylist = []
-		tuesdaymax = []
-		#the date counter
-		datecounter = firstdate
-		
-		while datecounter <= lastdate:
-			print(f'Processing {datecounter}')
-			try:
-				dates, amount = self.loadData(datecounter)
-				
-				if np.max(amount) < 610:
-					tuesdaymax = np.append(tuesdaymax, np.max(amount))
-					tuesdaylist = np.append(tuesdaylist, datecounter)
-			except:
-				print("Skipping date without data (" + str(datecounter) + ")")
-				
-			datecounter += dt.timedelta(days = 7)
-		
-		for i in np.arange(len(tuesdaylist)):
-			print(tuesdaylist[i], tuesdaymax[i])
+		firstdate = dt.date(2017, 9, 5)
+		lastdate = dt.date(2018, 7, 1)
+
+		if loadolddata:
+			daylist = np.load('daylist.npy')
+			daymax = np.load('daymax.npy')
+		else:
+			#array containing all the dates and max values
+			daylist = []
+			daymax = []
+			#the date counter
+			datecounter = firstdate
 			
+			while datecounter <= lastdate:
+				print(f'Processing {datecounter}')
+
+				try:
+					dates, amount = self.loadData(datecounter)
+					
+					if np.max(amount) < 610:
+						daymax = np.append(daymax, np.max(amount))
+						daylist = np.append(daylist, datecounter)
+				except:
+					print("Skipping date without data (" + str(datecounter) + ")")
+					
+				datecounter += dt.timedelta(days = 7)
+			
+			for i in np.arange(len(daylist)):
+				print(daylist[i], daymax[i])
+
+			np.save('daylist.npy', daylist)
+			np.save('daymax.npy', daymax)
+		
+		
 		#now we plot
-		plt.bar(tuesdaylist, tuesdaymax, width = 7, edgecolor = 'black')
-		plt.xlabel("Datum")
-		plt.ylabel("Maximaal aantal mensen in het pand")
+		plt.bar(daylist, daymax, width = 7, edgecolor = 'black')
+		plt.xlabel("Maand")
+		plt.ylabel("Maximaal aantal mensen")
 		plt.title("Maximaal aantal mensen in het pand per dinsdag")
-		plt.savefig("Maximaal aantal mensen alle dinsdagen 2016-2017.png", dpi = 200)
+
+		plt.xticks(rotation=40)
+
+		fig = plt.gcf()
+		fig.subplots_adjust(bottom=0.21)
+
+		plt.savefig("Maximaal aantal mensen alle dinsdagen 2017-2018.png", dpi = 200)
 		plt.show()
 
 	#np.savetxt('Dinsdagborrel_train_dates.txt', np.array(train_dates), fmt='%s')
