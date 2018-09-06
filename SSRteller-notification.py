@@ -7,7 +7,7 @@ from urllib.request import urlretrieve
 #for removing the downloaded file
 import os
 #for making and reading an SQL database
-import sqlite3 as lite
+# import sqlite3 as lite
 #to make the program sleep
 import time
 #for displaying a notification
@@ -32,6 +32,8 @@ latest = dt.datetime(1900, 1, 1)
 '''
 #maximum number of people in the building
 maxnum = 300
+#number of people when it is almost full
+almost_full = 240
 
 #name where the data will be downloaded
 downloadname = "./teller_log.txt"
@@ -344,7 +346,7 @@ def applyForest(X_train, X_test, Y_train, Y_test, train_dates, test_dates, hours
 	strat = 'mean'
 
 	#the type of features used 
-	feat_type = 'avg,deriv,n=1000,differentTestData'
+	feat_type = 'avg,deriv,n=1000,diffdataStop'
 
 		#preprocess the data: take out the nans
 	# Create our imputer to replace missing values with the mean e.g.
@@ -371,6 +373,7 @@ def applyForest(X_train, X_test, Y_train, Y_test, train_dates, test_dates, hours
 	predic_offset = np.zeros(len(prediction))
 	for j in np.arange(len(prediction)):
 		print('\nDate: {0}'.format(test_dates[j].date()))
+		print('Predicted full time: {0}'.format(secondsToDates([prediction[j]], test_dates[j], hourshift = hourshift)))
 		offset = (Y_test[j] - prediction[j])/60.
 		print('Time difference: {0} min'.format(round(offset, 1)))
 		predic_offset[j] = offset
@@ -384,15 +387,15 @@ def applyForest(X_train, X_test, Y_train, Y_test, train_dates, test_dates, hours
 
 	importances = clf.feature_importances_
 	indices = np.argsort(importances)[::-1]
-	print(feat_names)
-	print(importances)
-	print(np.shape(X_train))
-	print(np.shape(importances), np.shape(range(X_test.shape[1])))
-	std = np.std([tree.feature_importances_ for tree in clf.estimators_], axis=0)
-	plt.bar(range(X_test.shape[1]), importances,color="r", yerr=std, align="center")
+	# print(feat_names)
+	# print(importances)
+	# print(np.shape(X_train))
+	# print(np.shape(importances), np.shape(range(X_test.shape[1])))
+	# std = np.std([tree.feature_importances_ for tree in clf.estimators_], axis=0)
+	# plt.bar(range(X_test.shape[1]), importances,color="r", yerr=std, align="center")
 	#plt.xticks(range(X_test.shape[1]), indices)
 	#plt.xlim([-1, X_test.shape[1]])
-	plt.show()
+	# plt.show()
 
 	'''
 		#here we implement code from:
@@ -525,6 +528,9 @@ def loadRFdata(date_list, mintime, hourshift):
 	Load the train or test data for the random forests classifier.
 
 	"""
+
+	downloadData()
+
 	#the dictionaries containing the training data. We do not use arrays, because
 	#the data is of different lengths
 	dates = {}
@@ -552,10 +558,11 @@ def loadRFdata(date_list, mintime, hourshift):
 			maxamount = np.max(temp_amount)
 			max_amount = np.append(max_amount, maxamount)
 
-			#slice the data to the point where it is full
-			peakloc = np.where(temp_amount == maxamount)[0][0]
-			temp_dates = temp_dates[:peakloc]
-			temp_amount = temp_amount[:peakloc]
+			#slice the data to the point where it almost full
+			peakloc = np.argmax(temp_amount)
+			sliceidx = (np.arange(len(temp_amount)) < peakloc) * (temp_amount < 290)
+			temp_dates = temp_dates[sliceidx]
+			temp_amount = temp_amount[sliceidx]
 
 			dates[i] = temp_dates
 			amount[i] = temp_amount
@@ -637,12 +644,16 @@ date_list_train = np.array(date_list_train)
 
 #The dates of the test data
 #date_list_test = np.arange(dt.date(2017, 9, 5), dt.date(2017, 10, 2), dt.timedelta(days = 7)).astype(dt.date)
+'''
 testdates_str = np.loadtxt(test_data_name, dtype = str)
+
 #convert string to date objects
 date_list_test = []
 for dstr in testdates_str:
 	date_list_test.append(dt.datetime.strptime(dstr, '%Y-%m-%d'))
 date_list_test = np.array(date_list_test)
+'''
+date_list_test = np.array([dt.datetime(2018, 1, 9)])
 
 
 #load the trainings data
@@ -665,7 +676,7 @@ for k in test_dates.keys():
 	#location of the peak
 	peakloc = np.argmax(test_amount[k])
 	#slice to everything earlier than the peak and with an amount lower than the peak
-	sliceloc = (test_amount[k] < peakloc) * (test_amount[k] < maxnum - 60)
+	sliceloc = (test_amount[k] < peakloc) * (test_amount[k] < almost_full)
 	test_dates[k] = test_dates[k][sliceloc]
 	test_amount[k] = test_amount[k][sliceloc]
 	test_sec[k] = test_sec[k][sliceloc]
@@ -679,7 +690,7 @@ for k in test_dates.keys():
 test_features = np.reshape(np.array(test_features), (len(test_dates.keys()), -1))
 
 
-applyForest(train_features, test_features, train_fulltime, test_fulltime, date_list_train, date_list_test, hourshift, feat_names, append_results = True)
+applyForest(train_features, test_features, train_fulltime, test_fulltime, date_list_train, date_list_test, hourshift, feat_names, append_results = False)
 
 
 #continuously loop the program
