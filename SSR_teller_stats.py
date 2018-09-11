@@ -46,7 +46,8 @@ class processTeller(object):
 
 		self.cmap = 'jet'
 
-		self.fig_savename = 'Teller Grafiek EL CID 2018.png'
+		self.fig_savename = 'plot.png'
+		self.saveloc = './Plots/'
 
 	def loadData(self, download_date):
 		"""
@@ -85,7 +86,7 @@ class processTeller(object):
 				#add the date to the array if it is the correct day
 				#and if the time is not too early
 				#for this we need to shift the time
-				if (tdatetime - self.dt_hourshift).date() == download_date and tdatetime.time() > dt.time(20 - self.hourshift):
+				if (tdatetime - self.dt_hourshift).date() == download_date and (tdatetime - self.dt_hourshift).time() > dt.time(14 - self.hourshift):
 					#check if the current time is not equal to the previous one. If so,
 					#add the sum of the last few entries
 
@@ -100,7 +101,9 @@ class processTeller(object):
 
 	def plotsingleday(self, plotdate, colorval = 'green', alpha = 1, plotmultiplegraphs = False):
 		"""
-		Loads and plots the SSR teller data of a single day.
+		Loads and plots the SSR teller data of a single day. Do no 
+		use this function yourself! Call the plotMultipleDates()
+		or plotOneDay() function.
 
 		Input:
 			plotdate (datetime): The date of which the data must be plotted.
@@ -144,7 +147,46 @@ class processTeller(object):
 		plt.xlim(plotstart - dt.timedelta(minutes = 30), plotend + dt.timedelta(minutes = 30))
 		plt.ylim(-10, 310)
 
+		plt.xlabel('Tijd')
+		plt.ylabel('Aantal mensen')
+
 		return np.min(newdates), np.max(newdates)
+
+	def plotOneDay(self, date):
+		"""
+		Plots a single day including saving it and adding labels etc
+		"""
+
+		starttime, endtime = self.plotsingleday(date, colorval = 'g')	
+
+			#Change the xticks to display hours and minutes only
+		#first find the minimum date/time
+		#starttime = dt.datetime.combine(dt.date.today(), dt.time(20 - hourshift, 0))
+		#endtime = dt.datetime.combine(dt.date.today(), dt.time(24 + 4 - hourshift, 0))
+
+		orig_mindate = starttime
+		#then round this down to the hour
+		discard = dt.timedelta(minutes=orig_mindate.minute)
+		mindate = orig_mindate - discard
+		#then make arrays needed to change the ticks
+		oldLabels = np.arange(mindate, endtime + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
+		newLabels = []
+		for d in oldLabels:
+			#add the 'hourshift' amount of hours again to make it show the correct hours
+			newLabels.append(d.strftime("%H:%M"))
+
+		#rotate xticks and change the labels
+		plt.xticks(oldLabels, newLabels, rotation = 40)
+
+		plt.title(f'Aantal mensen te S.C.R.E.D. op {date.date()}')
+		plt.xlabel('Tijd')
+		plt.ylabel('Aantal')
+
+		fig = plt.gcf()
+		fig.subplots_adjust(bottom=0.19)
+
+		plt.savefig(f'{self.saveloc}{date.date()}_teller_stats.png', dpi = 200, bbox_inches = 'tight')
+		plt.show()
 
 	def plotMultipleDates(self, date_list):
 		"""
@@ -276,19 +318,7 @@ class processTeller(object):
 		throughout the year
 		"""
 
-		'''
-		2016-2017
-		dinsdag: 6-9-2016
-		vrijdag: 9-9-2016
-
-		2017-2018
-		dinsdag: 5-9-2017
-		vrijdag: 8-9-2017
-
-		2018-2019
-		dinsdag: 4-9-2018
-		vrijdag: 7-9-2018
-		'''
+		
 		firstdate = dt.date(2017, 9, 5)
 		lastdate = dt.date(2018, 7, 1)
 
@@ -339,173 +369,56 @@ class processTeller(object):
 
 	#np.savetxt('Dinsdagborrel_train_dates.txt', np.array(train_dates), fmt='%s')
 
+#start the class
 teller = processTeller()
 
-teller.barGraphWeekday()
+teller.fig_savename = teller.saveloc + 'Eerste dinsdag ieder collegejaar.png'
 
-# teller.plotsingleday(dt.datetime(2016, 9, 9))
-# plt.show()
+# teller.barGraphWeekday()
 
+# teller.plotOneDay(dt.datetime(2017, 9, 12))
+
+date_list = [
+			dt.datetime(2016, 9, 6),
+			dt.datetime(2017, 9, 5),
+			dt.datetime(2018, 9, 4)
+		]
+
+teller.plotMultipleDates(date_list)
+
+
+
+######################
+# All relevant dates #
+######################
 '''
+2016-2017
+dinsdag: 6-9-2016
+vrijdag: 9-9-2016
+
+2017-2018
+dinsdag: 5-9-2017
+vrijdag: 8-9-2017
+
+2018-2019
+dinsdag: 4-9-2018
+vrijdag: 7-9-2018
+
 #EL CID 2018
 days = [13, 14, 15, 16, 17]
 #EL CID 2017
 # days = [14, 15, 16, 17, 18]
 
-date_list = []
-for day in days:
-	date_list.append(dt.datetime(2018, 8, day))
-
-teller.plotMultipleDates(date_list)
-
-'''
-
-
-'''
-	#plot the most recent date
-def plotRecent(earliest, latest):
-	#first load the most recent date
-	#loop through dates starting at the most recent
-	rdate = date[::-1]
-	ramount = amount[::-1]
-	for i in np.arange(len(rdate)):
-		if rdate[i].time() > dt.time(12) and ramount[i] > 0:
-			recDate = rdate[i]
-			break
-	print(recDate)
-	#then plot it
-	earliest, latest = plotsingleday(recDate.year, recDate.month, recDate.day, 'b', earliest, latest)
-	return earliest, latest, recDate
-
-	
-
-	
-earliest, latest, recDate = plotRecent(earliest, latest)	
-
-	#plot data per day
-
-#first borrels in september 2016
-#earliest, latest = plotsingleday(2016, 9, 6, '#FB07FF', earliest, latest)
-#earliest, latest = plotsingleday(2016, 9, 13, '#FF0635', earliest, latest)
-#earliest, latest = plotsingleday(2016, 9, 20, '#FF6404', earliest, latest)
-#earliest, latest = plotsingleday(2016, 9, 27, '#FFCC26', earliest, latest)
-
-#Ik week 2017
-#earliest, latest = plotsingleday(2017, 2, 13, '#02B7FF', earliest, latest)
-#earliest, latest = plotsingleday(2017, 2, 14, '#FB07FF', earliest, latest)
-#earliest, latest = plotsingleday(2017, 2, 15, '#7306FF', earliest, latest)
-#earliest, latest = plotsingleday(2017, 2, 16, '#FF060D', earliest, latest)
-#earliest, latest = plotsingleday(2017, 2, 17, '#FF8E06', earliest, latest)
-
-
-#Oud & nieuw
-#earliest, latest = plotsingleday(2016, 12, 31, 'b', earliest, latest)
 #KSF 
-#earliest, latest = plotsingleday(2016, 12, 23, 'g', earliest, latest)
+2016-12-23
+2017-12-22
 
-#random date
-recDate = dt.datetime(2017,3,7)
-earliest, latest = plotsingleday(recDate.year, recDate.month, recDate.day, 
-								'b', earliest, latest)
+#Open week
+2017:
+2017-2-13 - 2017-2-17
 
-
-
-#EL CID 2017
-#plotsingleday(2017, 8, 14, '#02B7FF', earliest, latest)
-#plotsingleday(2017, 8, 15, '#FB07FF', earliest, latest)
-#plotsingleday(2017, 8, 16, '#7306FF', earliest, latest)
-#plotsingleday(2017, 8, 17, '#FF060D', earliest, latest)
-#plotsingleday(2017, 8, 18, '#FF8E06', earliest, latest)
-
-#EL CID 2016
-#plotsingleday(2016, 8, 15, '#02B7FF', earliest, latest)
-#plotsingleday(2016, 8, 16, '#FB07FF', earliest, latest)
-#plotsingleday(2016, 8, 17, '#7306FF', earliest, latest)
-#plotsingleday(2016, 8, 18, '#FF060D', earliest, latest)
-#plotsingleday(2016, 8, 19, '#FF8E06', earliest, latest)
-plotsingleday(2016, 9, 12, '#FF8E06', earliest, latest)
-
-plotsingleday(2017, 12, 22, '#02B7FF', earliest, latest)
-
+2018:
+2018-2-26 - 2018-3-2
 '''
 
 
-
-
-def plotOneDay(saveloc = './Plots/', hourshift = 6):
-	"""
-	Plots a single day including saving it and adding labels etc
-	"""
-	#23-6-2017: ZSF 2017
-	starttime, endtime = plotsingleday(dt.datetime(2017, 6, 20), colorval = 'b', hourshift = hourshift)	
-
-		#Change the xticks to display hours and minutes only
-	#first find the minimum date/time
-	#starttime = dt.datetime.combine(dt.date.today(), dt.time(20 - hourshift, 0))
-	#endtime = dt.datetime.combine(dt.date.today(), dt.time(24 + 4 - hourshift, 0))
-
-	orig_mindate = starttime
-	#then round this down to the hour
-	discard = dt.timedelta(minutes=orig_mindate.minute)
-	mindate = orig_mindate - discard
-	#then make arrays needed to change the ticks
-	oldLabels = np.arange(mindate, endtime + dt.timedelta(hours = 1), dt.timedelta(hours = 1)).astype(dt.time)
-	newLabels = []
-	for d in oldLabels:
-		#add the 'hourshift' amount of hours again to make it show the correct hours
-		newLabels.append((d + dt.timedelta(hours = hourshift)).strftime("%H:%M"))
-	#rotate xticks and change the labels
-	plt.xticks(oldLabels, newLabels, rotation = 40)
-	plt.title('Aantal mensen te S.C.R.E.D.')
-	plt.xlabel('Tijd')
-	plt.ylabel('Aantal')
-	plt.savefig("{0}plot.png".format(saveloc), dpi = 200, bbox_inches = 'tight')
-	plt.show()
-
-#lists containing the dates to be plotted
-'''
-#KSF 2016 and 2017
-years = [2016, 2017]
-months = [12, 12]
-days = [23, 22]
-date_list = []
-for y, m, d in zip(years, months, days):
-	date_list.append(dt.date(y,m,d))
-'''
-#All dinsdagborrels of the autumn of 2017
-# date_list1 = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
-# date_list2 = np.arange(dt.date(2016, 9, 6), dt.date(2016, 12, 21), dt.timedelta(days = 7)).astype(dt.date)
-
-#date range for the training data of the random forest
-#date_list1 = np.arange(dt.date(2016, 9, 6), dt.date(2017, 6, 20), dt.timedelta(days = 7)).astype(dt.date)
-#data range for the test data
-#date_list1 = np.arange(dt.date(2017, 9, 5), dt.date(2017, 12, 20), dt.timedelta(days = 7)).astype(dt.date)
-#plotDates_separate(date_list1, saveloc = 'Dinsdagborrels_collegejaar_2017-2018/')
-
-
-
-	#plot a single date
-# plotOneDay()
-
-
-'''
-#plot many lines using colors from a color map, with MAX the amount of lines
-#more color maps: http://matplotlib.org/users/colormaps.html
-import matplotlib.colors as colors
-import matplotlib.cm as cmx
-jet = plt.get_cmap('jet') 
-cNorm  = colors.Normalize(vmin = 0, vmax = len(days) - 1)
-scalarMap = cmx.ScalarMappable(norm = cNorm, cmap = jet)
-			
-for i, day in enumerate(days):
-	print(day)
-	colorVal = scalarMap.to_rgba(i)	
-
-	plotsingleday(dt.datetime(2017, 8, day), colorVal, 6)
-
-
-plt.savefig('EL CID 2017.png', dpi = 200)
-# plotsingleday(dt.datetime(2017, 9, 5), 'blue', 6)
-
-plt.show()
-'''
