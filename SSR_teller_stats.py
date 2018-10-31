@@ -77,12 +77,13 @@ class processTeller(object):
 			for line in f:
 				#split the line using the spaces
 				sl = line.split()
+
 				#convert the text month to a month number
 				monthN = monthlist.index(sl[3]) + 1
 				#find the date of the line
 				tempstring = '{0}-{1}-{2} {3}'.format(monthN, sl[4], sl[5], sl[6])
 				tdatetime = dt.datetime.strptime(tempstring, '%m-%d-%Y %H:%M:%S')
-				
+
 				#add the date to the array if it is the correct day
 				#and if the time is not too early
 				#for this we need to shift the time
@@ -91,13 +92,15 @@ class processTeller(object):
 					#add the sum of the last few entries
 
 					if (tdatetime - prevdate) > dt.timedelta(seconds = 0) and prevdate > dt.datetime(1900, 1, 1):
-						dates = np.append(dates, prevdate)
-						amount = np.append(amount, prevamount)
+						# dates = np.append(dates, prevdate)
+						# amount = np.append(amount, prevamount)
+						dates.append(prevdate)
+						amount.append(prevamount)
 						
 					prevdate = tdatetime
 					prevamount = int(sl[0])
 
-		return dates, amount
+		return np.array(dates), np.array(amount)
 
 	def plotsingleday(self, plotdate, colorval = 'green', alpha = 1, plotmultiplegraphs = False):
 		"""
@@ -312,59 +315,85 @@ class processTeller(object):
 			except:
 				print('No data')
 
-	def barGraphWeekday(self, loadolddata = False):
+	def barGraphWeekday(self, year, loadolddata = False, mode = 'maximum'):
 		"""
-		Plots a bar graph of maximum number of people on certain days 
-		throughout the year
+		Plots a bar graph of certain features of the data, determined by
+		the parameter 'mode'. Current options:
+		mode: 'maximum', 'peakstart'
 		"""
 
-		
-		firstdate = dt.date(2017, 9, 5)
-		lastdate = dt.date(2018, 7, 1)
+		if year == 2016:
+			firstdate = dt.date(2016, 9, 6)
+			lastdate = dt.date(2017, 7, 1)
+		elif year == 2017:
+			firstdate = dt.date(2017, 9, 5)
+			lastdate = dt.date(2018, 7, 1)
+		elif year == 2018:
+			firstdate = dt.date(2018, 9, 4)
+			lastdate = dt.date(2019, 7, 1)
 
 		if loadolddata:
 			daylist = np.load('daylist.npy')
-			daymax = np.load('daymax.npy')
+			dayfeat_value = np.load('dayfeat_value.npy')
 		else:
-			#array containing all the dates and max values
+			#array containing all the dates and feature values
 			daylist = []
-			daymax = []
+			dayfeat_value = []
 			#the date counter
 			datecounter = firstdate
 			
 			while datecounter <= lastdate:
 				print(f'Processing {datecounter}')
 
+
+				# try:
+				dates, amount = self.loadData(datecounter)
+				print(amount)
 				try:
-					dates, amount = self.loadData(datecounter)
-					
-					if np.max(amount) < 610:
-						daymax = np.append(daymax, np.max(amount))
-						daylist = np.append(daylist, datecounter)
+					print(np.where(amount == 300)[0])
 				except:
-					print("Skipping date without data (" + str(datecounter) + ")")
+					pass
+
+				#choose which feature we want to extract:
+				if mode == 'maximum':
+					if np.max(amount) < 610:
+						dayfeat_value = np.append(dayfeat_value, np.max(amount))
+						daylist = np.append(daylist, datecounter)
+				elif mode == 'peakstart':
+					dayfeat_value = np.append(dayfeat_value, 1)
+					# dayfeat_value = np.append(dayfeat_value, dates[np.where(amount == 300)[0][0]].time())
+					daylist = np.append(daylist, datecounter)
+
+				# except:
+				# 	print("Skipping date without data (" + str(datecounter) + ")")
 					
 				datecounter += dt.timedelta(days = 7)
 			
 			for i in np.arange(len(daylist)):
-				print(daylist[i], daymax[i])
+				print(daylist[i], dayfeat_value[i])
 
 			np.save('daylist.npy', daylist)
-			np.save('daymax.npy', daymax)
+			np.save('dayfeat_value.npy', dayfeat_value)
 		
+		print(dayfeat_value)
 		
 		#now we plot
-		plt.bar(daylist, daymax, width = 7, edgecolor = 'black')
+		plt.bar(daylist, dayfeat_value, width = 7, edgecolor = 'black')
 		plt.xlabel("Maand")
-		plt.ylabel("Maximaal aantal mensen")
-		plt.title("Maximaal aantal mensen in het pand per dinsdag")
 
+		if mode == 'maximum':
+			plt.ylabel("Maximaal aantal mensen")
+			plt.title("Maximaal aantal mensen in het pand per dinsdag")
+		elif mode == 'peakstart':
+			plt.ylabel("Tijd")
+			plt.title("Tijd dat het pand vol zit")
+		
 		plt.xticks(rotation=40)
 
 		fig = plt.gcf()
 		fig.subplots_adjust(bottom=0.21)
 
-		plt.savefig("Maximaal aantal mensen alle dinsdagen 2017-2018.png", dpi = 200)
+		plt.savefig(teller.fig_savename, dpi = 200)
 		plt.show()
 
 	#np.savetxt('Dinsdagborrel_train_dates.txt', np.array(train_dates), fmt='%s')
@@ -372,12 +401,14 @@ class processTeller(object):
 #start the class
 teller = processTeller()
 
-teller.fig_savename = teller.saveloc + 'Eerste dinsdag ieder collegejaar.png'
+# teller.fig_savename = teller.saveloc + 'Tijd van rij 2017-2018.png'
+teller.fig_savename = teller.saveloc + '10 oktober 2017.png'
+print(teller.saveloc)
 
-# teller.barGraphWeekday()
+# teller.barGraphWeekday(2017, loadolddata = False, mode = 'peakstart')
 
-# teller.plotOneDay(dt.datetime(2017, 9, 12))
-
+teller.plotOneDay(dt.datetime(2017, 10, 17))
+'''
 date_list = [
 			dt.datetime(2016, 9, 6),
 			dt.datetime(2017, 9, 5),
@@ -385,7 +416,7 @@ date_list = [
 		]
 
 teller.plotMultipleDates(date_list)
-
+'''
 
 
 ######################
