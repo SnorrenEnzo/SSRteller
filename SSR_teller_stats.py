@@ -402,12 +402,13 @@ class processTeller(object):
 teller = processTeller()
 
 # teller.fig_savename = teller.saveloc + 'Tijd van rij 2017-2018.png'
-teller.fig_savename = teller.saveloc + '10 oktober 2017.png'
+# teller.fig_savename = teller.saveloc + '10 oktober 2017.png'
+teller.fig_savename = teller.saveloc + '22 december 2017.png'
 print(teller.saveloc)
 
 # teller.barGraphWeekday(2017, loadolddata = False, mode = 'peakstart')
 
-teller.plotOneDay(dt.datetime(2017, 10, 17))
+teller.plotOneDay(dt.datetime(2017, 12, 22))
 '''
 date_list = [
 			dt.datetime(2016, 9, 6),
