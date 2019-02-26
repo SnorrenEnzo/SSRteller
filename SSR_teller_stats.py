@@ -16,6 +16,7 @@ import os
 #for getting many plotting colours
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
+from tqdm import tqdm
 
 sns.set()
 plt.close()
@@ -58,11 +59,32 @@ class processTeller(object):
 			#import data
 			data = np.loadtxt(self.downloadname, dtype = str).T
 			print("Loading old data. Remove 'Teller_log.txt' to download new data.")
-		except:
+		except OSError:
 			#download log
 			print("Downloading new data")
 			urlretrieve(self.url, self.downloadname)
-			data = np.loadtxt(self.downloadname, dtype = str).T
+
+			try:
+				data = np.loadtxt(self.downloadname, dtype = str).T
+			except ValueError:
+				#at some parts there are an incorrect number of columns
+				#lets remove these lines first
+				with open(self.downloadname, 'r') as f:
+					lines = f.readlines()
+
+				#check if there is a space in the first location of 
+				#the line; if so, remove it
+				newlines = []
+				for i in tqdm(range(len(lines))):
+					if lines[i][0] != ' ':
+						newlines.append(lines[i])
+
+				#write new lines to file
+				with open(self.downloadname, 'w') as f:
+					f.writelines(newlines)
+
+				#then again try to load the data
+				data = np.loadtxt(self.downloadname, dtype = str).T
 
 		monthlist = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 		
@@ -142,6 +164,12 @@ class processTeller(object):
 		plotstart = np.min(newdates)
 		plotend = np.max(newdates)
 
+		#change the starting point if there is a point before 20:00 h
+		#these points are generally made when resetting the teller
+		if plotstart.hour < 20:
+			plotstart = plotstart.replace(hour = 20) - self.dt_hourshift
+
+
 			#the plotting commands for plotting a single or multiple days
 		#makes plot nicer
 		sns.set_style("darkgrid", {'grid.color': '0.4', 'grid.linestyle': u':', 'legend.frameon': True})
@@ -153,7 +181,7 @@ class processTeller(object):
 		plt.xlabel('Tijd')
 		plt.ylabel('Aantal mensen')
 
-		return np.min(newdates), np.max(newdates)
+		return plotstart, plotend
 
 	def plotOneDay(self, date):
 		"""
@@ -216,6 +244,7 @@ class processTeller(object):
 			colorVal = scalarMap.to_rgba(i)	
 			
 			fd, ld = self.plotsingleday(date_list[i], colorval = colorVal, plotmultiplegraphs = True)
+			print(fd)
 			#append the found first and last time stamps
 			firstdates.append(fd)
 			lastdates.append(ld)
@@ -403,21 +432,22 @@ teller = processTeller()
 
 # teller.fig_savename = teller.saveloc + 'Tijd van rij 2017-2018.png'
 # teller.fig_savename = teller.saveloc + '10 oktober 2017.png'
-teller.fig_savename = teller.saveloc + '22 december 2017.png'
-print(teller.saveloc)
+teller.fig_savename = teller.saveloc + '2017_Open_Week.png'
 
 # teller.barGraphWeekday(2017, loadolddata = False, mode = 'peakstart')
 
-teller.plotOneDay(dt.datetime(2017, 12, 22))
-'''
+# teller.plotOneDay(dt.datetime(2017, 12, 22))
+
 date_list = [
-			dt.datetime(2016, 9, 6),
-			dt.datetime(2017, 9, 5),
-			dt.datetime(2018, 9, 4)
+			dt.datetime(2017, 2, 13),
+			dt.datetime(2017, 2, 14),
+			dt.datetime(2017, 2, 15),
+			dt.datetime(2017, 2, 16),
+			dt.datetime(2017, 2, 17)
 		]
 
 teller.plotMultipleDates(date_list)
-'''
+
 
 
 ######################
@@ -451,6 +481,9 @@ days = [13, 14, 15, 16, 17]
 
 2018:
 2018-2-26 - 2018-3-2
+
+2019:
+2018-2-25 - 2019-3-1
 '''
 
 
