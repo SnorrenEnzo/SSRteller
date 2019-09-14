@@ -45,8 +45,9 @@ class processTeller(object):
 		self.hourshift = 6
 		self.dt_hourshift = dt.timedelta(hours = self.hourshift)
 
-		self.cmap = 'jet'
+		self.cmap = 'jet' #jet
 
+		self.fig_title = 'Aantal mensen te S.C.R.E.D.'
 		self.fig_savename = 'plot.png'
 		self.saveloc = './Plots/'
 
@@ -72,7 +73,7 @@ class processTeller(object):
 				with open(self.downloadname, 'r') as f:
 					lines = f.readlines()
 
-				#check if there is a space in the first location of 
+				#check if there is a space in the first location of
 				#the line; if so, remove it
 				newlines = []
 				for i in tqdm(range(len(lines))):
@@ -87,15 +88,15 @@ class processTeller(object):
 				data = np.loadtxt(self.downloadname, dtype = str).T
 
 		monthlist = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-		
+
 		#arrays containing the data
 		dates = []
 		amount = []
-		
+
 		with open(self.downloadname, 'r') as f:
 			prevdate = dt.datetime(1900, 1, 1)
 			prevamount = 0
-			
+
 			for line in f:
 				#split the line using the spaces
 				sl = line.split()
@@ -118,7 +119,7 @@ class processTeller(object):
 						# amount = np.append(amount, prevamount)
 						dates.append(prevdate)
 						amount.append(prevamount)
-						
+
 					prevdate = tdatetime
 					prevamount = int(sl[0])
 
@@ -126,17 +127,17 @@ class processTeller(object):
 
 	def plotsingleday(self, plotdate, colorval = 'green', alpha = 1, plotmultiplegraphs = False):
 		"""
-		Loads and plots the SSR teller data of a single day. Do no 
+		Loads and plots the SSR teller data of a single day. Do no
 		use this function yourself! Call the plotMultipleDates()
 		or plotOneDay() function.
 
 		Input:
 			plotdate (datetime): The date of which the data must be plotted.
-			The date is defined as the starting date of the evening (parties almost always 
+			The date is defined as the starting date of the evening (parties almost always
 			go beyond 24:00 h).\n
 			colorval (matpotlib color value or str): the colour to be used for plotting the graph. \n
 			hourshift (int): the amount of hours the dates will be shifted by for plotting.\n
-			alpha (float): the translucence of the plot line. 0: completely translucent. 1: 
+			alpha (float): the translucence of the plot line. 0: completely translucent. 1:
 			completely opaque. Can be used to plot multiple dates with different line opacities.
 
 		Output:
@@ -174,7 +175,7 @@ class processTeller(object):
 		#makes plot nicer
 		sns.set_style("darkgrid", {'grid.color': '0.4', 'grid.linestyle': u':', 'legend.frameon': True})
 
-		#sets the xlim 
+		#sets the xlim
 		plt.xlim(plotstart - dt.timedelta(minutes = 30), plotend + dt.timedelta(minutes = 30))
 		plt.ylim(-10, 310)
 
@@ -188,7 +189,7 @@ class processTeller(object):
 		Plots a single day including saving it and adding labels etc
 		"""
 
-		starttime, endtime = self.plotsingleday(date, colorval = 'g')	
+		starttime, endtime = self.plotsingleday(date, colorval = 'g')
 
 			#Change the xticks to display hours and minutes only
 		#first find the minimum date/time
@@ -228,8 +229,9 @@ class processTeller(object):
 			date_list (datetime array): array of dates.
 		"""
 		#initialize functions to get many plotting colours
-		jet = plt.get_cmap(self.cmap) 
-		cNorm  = colors.Normalize(vmin = 0, vmax = len(date_list) + 1)
+		jet = plt.get_cmap(self.cmap)
+		cNorm  = colors.Normalize(vmin = 0, vmax = len(date_list))
+		print(len(date_list))
 		scalarMap = cmx.ScalarMappable(norm = cNorm, cmap = jet)
 
 		#the first and last time stamps found for each date
@@ -241,10 +243,9 @@ class processTeller(object):
 
 		#plot all the dates
 		for i in np.arange(len(date_list)):
-			colorVal = scalarMap.to_rgba(i)	
-			
+			colorVal = scalarMap.to_rgba(i)
+
 			fd, ld = self.plotsingleday(date_list[i], colorval = colorVal, plotmultiplegraphs = True)
-			print(fd)
 			#append the found first and last time stamps
 			firstdates.append(fd)
 			lastdates.append(ld)
@@ -269,17 +270,17 @@ class processTeller(object):
 		#auto rotate the labels
 		fig.autofmt_xdate()
 
-		plt.legend(loc = 'best', shadow = True).draggable()
-		plt.title('Aantal mensen te S.C.R.E.D.')
+		plt.legend(loc = 'best', shadow = True)
+		plt.title(self.fig_title)
 		plt.xlabel('Tijd')
 		plt.ylabel('Aantal')
-		plt.savefig(self.fig_savename, bbox_inches='tight', dpi = 200)
+		plt.savefig(f'{self.saveloc}{self.fig_savename}', bbox_inches='tight', dpi = 200)
 		plt.show()
 
 	def plotDates_separate(self, date_list1, datelist2 = None, saveloc = 'Dinsdagborrels_herfst_2017/'):
 		"""
-		Plot multiple dates, but each as a separate file. This way the images can later be 
-		used as frames in a video. 
+		Plot multiple dates, but each as a separate file. This way the images can later be
+		used as frames in a video.
 
 		Input:
 			date_list1 (datetime array): list of dates to be plotted. \n
@@ -300,12 +301,12 @@ class processTeller(object):
 		train_dates = []
 
 		#plot all the dates
-		for i in np.arange(len(date_list1)):	
+		for i in np.arange(len(date_list1)):
 
 			print('Processing {0}'.format(date_list1[i].date()))
 
-			fig = plt.figure(figsize=(9,6))	
-			
+			fig = plt.figure(figsize=(9,6))
+
 			try:
 				fd, ld = plotsingleday(date_list1[i], colorval = colorVal)
 				if datelist2 is not None:
@@ -332,7 +333,7 @@ class processTeller(object):
 				#auto rotate the labels
 				fig.autofmt_xdate()
 
-				plt.legend(loc = 'upper right', shadow = True).draggable()
+				plt.legend(loc = 'upper right', shadow = True)
 				plt.title('Aantal mensen te S.C.R.E.D.')
 				plt.xlabel('Tijd')
 				plt.ylabel('Aantal')
@@ -370,7 +371,7 @@ class processTeller(object):
 			dayfeat_value = []
 			#the date counter
 			datecounter = firstdate
-			
+
 			while datecounter <= lastdate:
 				print(f'Processing {datecounter}')
 
@@ -395,17 +396,17 @@ class processTeller(object):
 
 				# except:
 				# 	print("Skipping date without data (" + str(datecounter) + ")")
-					
+
 				datecounter += dt.timedelta(days = 7)
-			
+
 			for i in np.arange(len(daylist)):
 				print(daylist[i], dayfeat_value[i])
 
 			np.save('daylist.npy', daylist)
 			np.save('dayfeat_value.npy', dayfeat_value)
-		
+
 		print(dayfeat_value)
-		
+
 		#now we plot
 		plt.bar(daylist, dayfeat_value, width = 7, edgecolor = 'black')
 		plt.xlabel("Maand")
@@ -416,7 +417,7 @@ class processTeller(object):
 		elif mode == 'peakstart':
 			plt.ylabel("Tijd")
 			plt.title("Tijd dat het pand vol zit")
-		
+
 		plt.xticks(rotation=40)
 
 		fig = plt.gcf()
@@ -430,60 +431,87 @@ class processTeller(object):
 #start the class
 teller = processTeller()
 
-# teller.fig_savename = teller.saveloc + 'Tijd van rij 2017-2018.png'
-# teller.fig_savename = teller.saveloc + '10 oktober 2017.png'
-teller.fig_savename = teller.saveloc + '2017_Open_Week.png'
-
 # teller.barGraphWeekday(2017, loadolddata = False, mode = 'peakstart')
 
-# teller.plotOneDay(dt.datetime(2017, 12, 22))
+'''
+year = 2016
+month = 9
+days = [6, 13, 20, 27]
 
+date_list = []
+for d in days:
+	date_list.append(dt.datetime(year, month, d))
+'''
+
+year = 2019
 date_list = [
-			dt.datetime(2017, 2, 13),
-			dt.datetime(2017, 2, 14),
-			dt.datetime(2017, 2, 15),
-			dt.datetime(2017, 2, 16),
-			dt.datetime(2017, 2, 17)
+			dt.datetime(year, 2, 25),
+			dt.datetime(year, 2, 26),
+			dt.datetime(year, 2, 27),
+			dt.datetime(year, 2, 28),
+			dt.datetime(year, 3, 1)
 		]
+
+teller.fig_title = f"Teller grafiek Open Week {year}"
+teller.fig_savename = f'{teller.fig_title}.png'
 
 teller.plotMultipleDates(date_list)
 
+# teller.plotOneDay(dt.datetime(2019, 6, 4))
 
 
 ######################
 # All relevant dates #
 ######################
 '''
-2016-2017
-dinsdag: 6-9-2016
-vrijdag: 9-9-2016
-
-2017-2018
-dinsdag: 5-9-2017
-vrijdag: 8-9-2017
 
 2018-2019
 dinsdag: 4-9-2018
 vrijdag: 7-9-2018
 
+2017-2018
+dinsdag: 5-9-2017
+vrijdag: 8-9-2017
+
+2016-2017
+dinsdag: 6-9-2016
+vrijdag: 9-9-2016
+
+
+#EL CID 2019
+days = [12, 13, 14, 15, 16]
 #EL CID 2018
 days = [13, 14, 15, 16, 17]
 #EL CID 2017
-# days = [14, 15, 16, 17, 18]
+days = [14, 15, 16, 17, 18]
+#EL CID 2016
+days = [15, 16, 17, 18, 19]
 
-#KSF 
+#Dinsdagen 2018
+days = [4, 11, 18, 25]
+#Dinsdagen 2017
+days = [5, 12, 19, 26]
+#Dinsdagen 2016
+days = [6, 13, 20, 27]
+
+
+#KSF's
 2016-12-23
 2017-12-22
+2018-12-21
 
-#Open week
-2017:
-2017-2-13 - 2017-2-17
+#Open week 2017
+2017: 2017-2-13 - 2017-2-17
+2018: 2018-2-26 - 2018-3-2
+2019: 2019-2-25 - 2019-3-1
 
-2018:
-2018-2-26 - 2018-3-2
+#ZSF's
+2017-06-23
+2018-06-22
+2019-06-21
 
-2019:
-2018-2-25 - 2019-3-1
+#laatste dinsdagborrel
+2017-06-20
+2018-06-19
+2019-06-18
 '''
-
-
